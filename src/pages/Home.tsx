@@ -1,0 +1,9 @@
+const Home = () => {
+  return (
+    <div className="bg-blue-800">
+      <h1>Welcome to Dev Spot</h1>
+    </div>
+  );
+};
+
+export default Home;
