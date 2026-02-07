@@ -1,16 +1,15 @@
-import { Outlet } from 'react-router-dom';
-
-import Navbar from './components/Navbar.jsx'
+import { Outlet } from "react-router-dom";
+import Navbar from "./components/Navbar.jsx";
 
 function App() {
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main>
+      <main className="flex-1">
         <Outlet />
       </main>
-    </>
-  )
+    </div>
+  );
 }
 
 export default App;
