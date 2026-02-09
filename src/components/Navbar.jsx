@@ -45,13 +45,6 @@ const Navbar = () => {
 
       {/* Main Nav Links */}
       <div className="flex items-center gap-6">
-        <NavLink
-          to="/"
-          className={(args) => linkClass(args)}
-          style={({ isActive }) => ({ color: isActive ? "var(--text)" : "var(--text-muted)" })}
-        >
-          Home
-        </NavLink>
         
         <NavLink
           to="/find-jobs"
@@ -65,8 +58,17 @@ const Navbar = () => {
           Find Jobs
         </NavLink>
 
-        <button className="text-[14px]" style={{ color: "var(--text-muted)" }}>Find Talent</button>
-        <button className="text-[14px]" style={{ color: "var(--text-muted)" }}>Messages</button>
+          <NavLink
+          to="/hire-talent"
+          className={({ isActive }) =>
+            `text-[14px] transition-colors ${isActive ? "font-semibold" : ""}`
+          }
+          style={({ isActive }) => ({
+            color: isActive ? "var(--text)" : "var(--text-muted)",
+          })}
+        >
+          Hire Talent
+        </NavLink>
       </div>
 
       {/* Search Bar */}
@@ -100,13 +102,14 @@ const Navbar = () => {
           Post a Job
         </NavLink>
 
-        <button
+        <NavLink
+        to="/messages"
           className="p-2 rounded-lg hover:bg-opacity-10 transition-colors relative"
           style={{ color: "var(--text-muted)" }}
           aria-label="Messages"
         >
           <MessageSquare className="w-5 h-5" />
-        </button>
+        </NavLink>
 
         <button
           className="p-2 rounded-lg hover:bg-opacity-10 transition-colors relative"

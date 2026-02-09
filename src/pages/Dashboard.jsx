@@ -28,9 +28,7 @@ export default function Dashboard({ userType = "client", userName = "Tristen" })
   );
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "white", padding: 24 }}>
-      Dashboard placeholder ✅
-
-      
+      Dashboard placeholder 
 
       {activeTab === "profile" && (
         <ProfilePage userType={userType} userName={userName} />
