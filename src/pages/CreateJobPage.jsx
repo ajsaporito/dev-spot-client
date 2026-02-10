@@ -10,6 +10,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 export function CreateJobPage() {
   const [projectType, setProjectType] = useState("fixed"); // 'fixed' | 'hourly'

@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export default function HireTalentPage() {
   return (
     <div className="min-h-screen p-6" style={{ color: "var(--text)" }}>

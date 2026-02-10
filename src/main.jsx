@@ -7,11 +7,13 @@ import "./styles/style.css";
 
 import App from './App.jsx'
 import { CreateJobPage } from './pages/CreateJobPage.jsx'
-import Dashboard from "./pages/Dashboard.jsx";
 import FindJobsPage from "./pages/FindJobsPage.jsx";
 import HireTalentPage from "./pages/HireTalentPage.jsx";
+import {HybridDashboard} from "./pages/HybridDashboard.jsx";
+import { LoginPage } from './pages/LoginPage.jsx';
 import { MessagesPage } from "./pages/MessagesPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
+import {SignupPage} from './pages/SignupPage.jsx';
 import TalentProfilePage from "./pages/TalentProfilePage";
 
 import NotFound from './pages/NotFound.jsx'
@@ -22,12 +24,15 @@ createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />}>
-          <Route index element={<Dashboard />} />
+          <Route index element={<HybridDashboard />} />
           <Route path="create-job" element={<CreateJobPage />} />
+          <Route path="dashboard" element={<HybridDashboard />} />
           <Route path="find-jobs" element={<FindJobsPage />} />
           <Route path="hire-talent" element={<HireTalentPage />} />
+          <Route path="login" element={<LoginPage />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="signup" element={<SignupPage />} />
           <Route path="talent" element={<TalentProfilePage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
