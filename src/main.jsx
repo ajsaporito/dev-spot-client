@@ -7,9 +7,10 @@ import "./styles/style.css";
 
 import App from './App.jsx'
 import { CreateJobPage } from './pages/CreateJobPage.jsx'
-import FindJobsPage from "./pages/FindJobsPage.jsx";
+import {FindJobsPage} from "./pages/FindJobsPage.jsx";
 import HireTalentPage from "./pages/HireTalentPage.jsx";
 import {HybridDashboard} from "./pages/HybridDashboard.jsx";
+import { JobDetailPage } from './pages/JobDetailPage.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { MessagesPage } from "./pages/MessagesPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')).render(
           <Route path="dashboard" element={<HybridDashboard />} />
           <Route path="find-jobs" element={<FindJobsPage />} />
           <Route path="hire-talent" element={<HireTalentPage />} />
+          <Route path="job/:id" element={<JobDetailPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="messages" element={<MessagesPage />} />
           <Route path="profile" element={<ProfilePage />} />
