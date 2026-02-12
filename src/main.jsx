@@ -16,7 +16,6 @@ import { MessagesPage } from "./pages/MessagesPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import {SignupPage} from './pages/SignupPage.jsx';
 import TalentProfilePage from "./pages/TalentProfilePage";
-
 import NotFound from './pages/NotFound.jsx'
 
 
