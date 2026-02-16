@@ -9,13 +9,13 @@ import App from './App.jsx'
 import { CreateJobPage } from './pages/CreateJobPage.jsx'
 import {FindJobsPage} from "./pages/FindJobsPage.jsx";
 import HireTalentPage from "./pages/HireTalentPage.jsx";
-import {HybridDashboard} from "./pages/HybridDashboard.jsx";
+import { HybridDashboard } from "./pages/HybridDashboard.jsx";
 import { JobDetailPage } from './pages/JobDetailPage.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { MessagesPage } from "./pages/MessagesPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
-import {SignupPage} from './pages/SignupPage.jsx';
-import TalentProfilePage from "./pages/TalentProfilePage";
+import { SignupPage } from './pages/SignupPage.jsx';
+import  TalentProfilePage  from "./pages/TalentProfilePage";
 import NotFound from './pages/NotFound.jsx'
 
 
@@ -34,7 +34,7 @@ createRoot(document.getElementById('root')).render(
           <Route path="messages" element={<MessagesPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="signup" element={<SignupPage />} />
-          <Route path="talent" element={<TalentProfilePage />} />
+          <Route path="/talent/:talentId" element={<TalentProfilePage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

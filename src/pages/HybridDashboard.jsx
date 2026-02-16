@@ -208,7 +208,7 @@ export function HybridDashboard() {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedJobForReview, setSelectedJobForReview] = useState(null);
 
-  // 🔹 State for Requests modal
+  // State for Requests modal
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [openJobs, setOpenJobs] = useState(initialOpenJobs);

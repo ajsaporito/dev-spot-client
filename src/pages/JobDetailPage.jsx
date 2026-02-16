@@ -16,8 +16,6 @@ import {
   Award,
 } from "lucide-react";
 
-// ✅ Use the same shared mock jobs list as FindJobsPage
-// Adjust the path to wherever you placed the file.
 import { mockJobs } from "../data/mockJobs";
 
 export function JobDetailPage() {
@@ -28,7 +26,7 @@ export function JobDetailPage() {
   const [isSaved, setIsSaved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ✅ Find the matching job by id
+  // Find the matching job by id
   const job = useMemo(() => {
     const found = mockJobs.find((j) => Number(j.id) === jobId);
     return found || null;
@@ -326,7 +324,7 @@ export function JobDetailPage() {
               </div>
             </div>
 
-                        {/* Skills */}
+            {/* Skills */}
             <div
               className="rounded-lg border p-6"
               style={{ background: "var(--panel)", borderColor: "var(--border)" }}
