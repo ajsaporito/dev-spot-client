@@ -2,11 +2,14 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { Plus, Search, MessageSquare, Bell, User, LogOut, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { getUser, clearSession } from "../api/client";
+
 const Navbar = () => {
   const navigate = useNavigate();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const [me, setMe] = useState(() => getUser());
 
   useEffect(() => {
     const onClickOutside = (e) => {
@@ -18,11 +21,16 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  useEffect(() => {
+    const onStorage = () => setMe(getUser());
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const handleLogout = () => {
     setMenuOpen(false);
-    // TODO: replace with real logout (clear token, call API, etc.)
-    console.log("logout");
-    navigate("/"); // or navigate("/login") once you add it
+    clearSession();
+    navigate("/login");
   };
 
   const linkClass = ({ isActive }) =>
@@ -30,7 +38,7 @@ const Navbar = () => {
 
   return (
     <nav
-      className="h-16 border-b flex items-center px-6 gap-6"
+      className="h-16 border-b flex items-center px-6 gap-6 sticky top-0 z-50"
       style={{ background: "var(--panel)", borderColor: "var(--border)" }}
     >
       {/* Logo */}
@@ -124,14 +132,24 @@ const Navbar = () => {
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            className="flex items-center gap-2 pl-3 border-l"
+            className="flex items-center gap-2 pl-3 border-l cursor-pointer"
             style={{ borderColor: "var(--border)" }}
           >
             <div
-              className="w-8 h-8 rounded-full grid place-items-center text-[14px]"
+              className="w-8 h-8 rounded-full overflow-hidden grid place-items-center"
               style={{ background: "var(--accent)", color: "#ffffff" }}
             >
-              JD
+              {me?.profilePicUrl ? (
+                <img
+                  src={`https://localhost:7048${me.profilePicUrl}`}
+                  alt="Profile Picture"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-[12px] font-semibold">
+                  {(me?.username?.[0] ?? "U").toUpperCase()}
+                </span>
+              )}
             </div>
             <ChevronDown
               className={`w-4 h-4 transition-transform ${menuOpen ? "rotate-180" : ""}`}
@@ -145,7 +163,7 @@ const Navbar = () => {
               style={{ background: "var(--panel)", borderColor: "var(--border)" }}
             >
               <button
-                className="w-full flex items-center gap-2 px-4 py-3 text-[14px] hover:opacity-90"
+                className="w-full flex items-center gap-2 px-4 py-3 text-[14px] hover:opacity-90 cursor-pointer"
                 style={{ color: "var(--text)" }}
                 onClick={() => {
                   setMenuOpen(false);
@@ -159,7 +177,7 @@ const Navbar = () => {
               <div className="h-px" style={{ background: "var(--border)" }} />
 
               <button
-                className="w-full flex items-center gap-2 px-4 py-3 text-[14px] hover:opacity-90"
+                className="w-full flex items-center gap-2 px-4 py-3 text-[14px] hover:opacity-90 cursor-pointer"
                 style={{ color: "var(--text)" }}
                 onClick={handleLogout}
               >

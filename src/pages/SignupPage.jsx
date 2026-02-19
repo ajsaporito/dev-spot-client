@@ -1,30 +1,61 @@
 import { Eye, EyeOff, Upload, X, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+
+import { register } from "../api/auth";
+import { uploadProfilePhoto } from "../services/upload";
 
 export function SignupPage({ onSwitchToLogin, onComplete }) {
+  const nav = useNavigate();
+
   const [showPassword, setShowPassword] = useState(false);
 
- 
+  // Skills map to Skill + UserSkill
+  const [skills, setSkills] = useState([]);
+  const [skillInput, setSkillInput] = useState("");
+
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const nameRegex = /^[A-Za-z][A-Za-z\s'-]*$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  function validateSignup(formData) {
+    const errors = {};
+
+    const first = formData.firstName.trim();
+    const last = formData.lastName.trim();
+    const username = formData.username.trim();
+    const email = formData.email.trim();
+    const password = formData.password;
+
+    if (first.length < 1) errors.firstName = "First name is required.";
+    else if (!nameRegex.test(first)) errors.firstName = "First name cannot contain numbers.";
+
+    if (last.length < 1) errors.lastName = "Last name is required.";
+    else if (!nameRegex.test(last)) errors.lastName = "Last name cannot contain numbers.";
+
+    if (username.length < 3) errors.username = "Username must be at least 3 characters.";
+
+    if (!emailRegex.test(email)) errors.email = "Please enter a valid email.";
+
+    if (password.length < 8) errors.password = "Password must be at least 8 characters.";
+
+    return errors;
+  }
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     username: "",
     email: "",
     password: "",
-
     locationCountry: "",
     locationCity: "",
     bio: "",
-
-    profilePhoto: null 
+    profilePhoto: null,
+    skills: skills
   });
-
-  // Skills map to Skill + UserSkill
-  const [skills, setSkills] = useState([]);
-  const [skillInput, setSkillInput] = useState("");
-
-  const [agreeToTerms, setAgreeToTerms] = useState(false);
 
   const bioCount = useMemo(() => formData.bio.length, [formData.bio]);
 
@@ -46,8 +77,41 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
     setSkills((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
+    setError("");
+
+    const errors = validateSignup(formData);
+    if (Object.keys(errors).length > 0) {
+      const firstMsg = Object.values(errors)[0];
+      setError(firstMsg);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await register({
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        locationCountry: formData.locationCountry || null,
+        locationCity: formData.locationCity || null,
+        bio: formData.bio || null,
+        profilePicUrl: null,
+        skills: skills
+      });
+      
+      if (formData.profilePhoto) {
+        await uploadProfilePhoto(formData.profilePhoto);
+      }
+      nav("/dashboard");
+    } catch (err) {
+      setError(err.message || "Signup failed");
+    } finally {
+      setLoading(false);
+    }
 
     if (typeof onComplete === "function") onComplete();
   };
@@ -99,7 +163,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
-                    First name
+                    * First name
                   </label>
                   <input
                     type="text"
@@ -113,7 +177,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
 
                 <div>
                   <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
-                    Last name
+                    * Last name
                   </label>
                   <input
                     type="text"
@@ -129,7 +193,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
               {/* Username */}
               <div>
                 <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
-                  Username
+                  * Username
                 </label>
                 <input
                   type="text"
@@ -139,15 +203,12 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
                   className="w-full px-4 py-3 rounded-lg border outline-none transition-colors text-[15px]"
                   style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
                 />
-                <p className="text-[12px] mt-2" style={{ color: "var(--text-muted)" }}>
-                  This maps to your User.Username field
-                </p>
               </div>
 
               {/* Email */}
               <div>
                 <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
-                  Email
+                  * Email
                 </label>
                 <input
                   type="email"
@@ -162,7 +223,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
               {/* Password */}
               <div>
                 <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
-                  Password
+                  * Password
                 </label>
                 <div className="relative">
                   <input
@@ -180,31 +241,12 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
                     style={{ color: "var(--text-muted)" }}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? <EyeOff className="w-5 h-5 cursor-pointer" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
 
-              {/* Terms */}
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={agreeToTerms}
-                  onChange={(e) => setAgreeToTerms(e.target.checked)}
-                  className="w-4 h-4 rounded border cursor-pointer mt-0.5"
-                  style={{ accentColor: "var(--accent)", borderColor: "var(--border)" }}
-                />
-                <span className="text-[13px]" style={{ color: "var(--text)" }}>
-                  I agree to the{" "}
-                  <a href="#" className="hover:underline" style={{ color: "var(--accent)" }}>
-                    Terms of Service
-                  </a>{" "}
-                  and{" "}
-                  <a href="#" className="hover:underline" style={{ color: "var(--accent)" }}>
-                    Privacy Policy
-                  </a>
-                </span>
-              </label>
+
             </div>
           </div>
 
@@ -215,7 +257,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
                 Profile
               </h3>
               <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-                Optional fields that map to your User profile columns
+                Optional fields that can be filled in later
               </p>
             </div>
 
@@ -233,14 +275,14 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
                     style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
                   >
                     <option value="">Select country</option>
-                    <option value="us">United States</option>
-                    <option value="uk">United Kingdom</option>
-                    <option value="ca">Canada</option>
-                    <option value="au">Australia</option>
-                    <option value="de">Germany</option>
-                    <option value="fr">France</option>
-                    <option value="in">India</option>
-                    <option value="other">Other</option>
+                    <option value="United States">United States</option>
+                    <option value="United Kingdom">United Kingdom</option>
+                    <option value="Canada">Canada</option>
+                    <option value="Australia">Australia</option>
+                    <option value="Germany">Germany</option>
+                    <option value="France">France</option>
+                    <option value="India">India</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 
@@ -301,7 +343,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
                   <button
                     type="button"
                     onClick={addSkill}
-                    className="px-4 py-3 rounded-lg border transition-colors"
+                    className="px-4 py-3 rounded-lg border transition-colors cursor-pointer"
                     style={{ background: "var(--panel-2)", borderColor: "var(--border)" }}
                     aria-label="Add skill"
                   >
@@ -321,7 +363,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
                           {skill}
                         </span>
                         <button type="button" onClick={() => removeSkill(index)} className="hover:opacity-70">
-                          <X className="w-3 h-3" style={{ color: "var(--text-muted)" }} />
+                          <X className="w-3 h-3 cursor-pointer" style={{ color: "var(--text-muted)" }} />
                         </button>
                       </div>
                     ))}
@@ -341,7 +383,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
 
                 <div className="flex items-center gap-6">
                   <div
-                    className="w-24 h-24 rounded-full border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-[#313744] transition-colors flex-shrink-0 overflow-hidden"
+                    className="w-24 h-24 rounded-full border-2 border-dashed flex items-center justify-center hover:border-[#313744] transition-colors flex-shrink-0 overflow-hidden"
                     style={{ borderColor: "var(--border)", background: "var(--panel-2)" }}
                   >
                     {formData.profilePhoto ? (
@@ -358,7 +400,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
                   <div>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                       className="hidden"
                       id="photo-upload"
                       onChange={(e) => {
@@ -376,7 +418,7 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
                     </label>
 
                     <p className="text-[12px] mt-2" style={{ color: "var(--text-muted)" }}>
-                      JPG, PNG or GIF. Max size 5MB
+                      JPG, PNG or WEBP. Make size: 20MB.
                     </p>
                   </div>
                 </div>
@@ -386,12 +428,14 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
 
           {/* Submit */}
           <button
+            disabled={loading}
             type="submit"
-            className="w-full px-6 py-3 rounded-full border-0 transition-opacity hover:opacity-90 text-[15px]"
+            className="w-full px-6 py-3 rounded-full border-0 transition-opacity hover:opacity-90 text-[15px] cursor-pointer"
             style={{ background: "var(--accent)", color: "#ffffff" }}
           >
-            Create my account
+            {loading ? "Creating..." : "Create account"}
           </button>
+          {error && <p className="text-red-500 mt-3">{error}</p>}
         </form>
       </div>
 
@@ -399,12 +443,12 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
       <div className="text-center mt-6">
         <p className="text-[15px]" style={{ color: "var(--text-muted)" }}>
           Already have an account?{" "}
-        <Link
-          to="/login"
-          className="hover:underline"
-          style={{ color: "var(--accent)" }}>
-          Log in
-        </Link>
+          <Link
+            to="/login"
+            className="hover:underline"
+            style={{ color: "var(--accent)" }}>
+            Log in
+          </Link>
         </p>
       </div>
     </div>

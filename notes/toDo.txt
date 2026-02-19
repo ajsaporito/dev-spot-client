@@ -1,0 +1,8 @@
+Dashboard:
+    Client:
+    1. Add Confirmation after submitting review
+    Freelancer
+    2.View Detail Links (Active Gigs, Completed Work)
+
+ProfilePage:
+1. Set up
