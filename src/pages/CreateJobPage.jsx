@@ -107,39 +107,6 @@ export function CreateJobPage() {
             </div>
           </div>
 
-          {/* Category */}
-          <div
-            className="p-6 rounded-[14px] border space-y-4"
-            style={{
-              background: "var(--panel)",
-              borderColor: "var(--border)",
-              boxShadow: "var(--shadow)",
-            }}
-          >
-            <div>
-              <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
-                Category <span style={{ color: "var(--accent)" }}>*</span>
-              </label>
-              <select
-                className="w-full px-4 py-2.5 rounded-lg border outline-none transition-colors text-[14px]"
-                style={{
-                  background: "var(--panel-2)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
-              >
-                <option value="">Select a category</option>
-                <option value="web-dev">Web Development</option>
-                <option value="mobile-dev">Mobile Development</option>
-                <option value="design">Design & Creative</option>
-                <option value="writing">Writing & Content</option>
-                <option value="marketing">Marketing & SEO</option>
-                <option value="data">Data & Analytics</option>
-                <option value="devops">DevOps & Cloud</option>
-                <option value="ai-ml">AI & Machine Learning</option>
-              </select>
-            </div>
-          </div>
 
           {/* Skills Required */}
           <div

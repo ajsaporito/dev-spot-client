@@ -1,29 +1,21 @@
 import { useState } from "react";
-import {
-  X,
-  Star,
-  MapPin,
-  CheckCircle,
-  Clock,
-  MessageSquare,
-  Eye,
-  ThumbsUp,
-  ThumbsDown,
-} from "lucide-react";
+import { X, Star, MapPin, MessageSquare, ThumbsUp, ThumbsDown } from "lucide-react";
 
-export function ViewRequestsModal({  
+export function ViewRequestsModal({
   isOpen,
   onClose,
   jobId,
   jobTitle,
   requests,
-  onUpdateStatus, }) {
-  const [selectedRequestId, setSelectedRequestId] = useState(null);
-  const [filter, setFilter] = useState("all"); // 'all' | 'pending' | 'interviewing'
+  onUpdateStatus,
+}) {
+  const [filter, setFilter] = useState("all"); // 'all' | 'pending' | 'rejected'
 
   if (!isOpen) return null;
 
-  const filteredRequests = requests.filter((r) => {
+  const safeRequests = requests || [];
+
+  const filteredRequests = safeRequests.filter((r) => {
     if (filter === "all") return true;
     return r.status === filter;
   });
@@ -32,12 +24,10 @@ export function ViewRequestsModal({
     switch (status) {
       case "accepted":
         return "var(--accent)";
-      case "declined":
+      case "rejected":
         return "var(--danger)";
-      case "interviewing":
-        return "var(--blue)";
       default:
-        return "var(--text-muted)";
+        return "var(--text-muted)"; // pending (or unknown)
     }
   };
 
@@ -45,17 +35,15 @@ export function ViewRequestsModal({
     switch (status) {
       case "accepted":
         return "Accepted";
-      case "declined":
-        return "Declined";
-      case "interviewing":
-        return "Interviewing";
+      case "rejected":
+        return "Rejected";
       default:
         return "Pending";
     }
   };
 
-  const pendingCount = requests.filter((r) => r.status === "pending").length;
-  const interviewingCount = requests.filter((r) => r.status === "interviewing").length;
+  const pendingCount = safeRequests.filter((r) => r.status === "pending").length;
+  const rejectedCount = safeRequests.filter((r) => r.status === "rejected").length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -77,7 +65,7 @@ export function ViewRequestsModal({
               Requests for: {jobTitle}
             </h2>
             <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-              {requests.length} total {requests.length === 1 ? "request" : "requests"}
+              {safeRequests.length} total {safeRequests.length === 1 ? "request" : "requests"}
             </p>
           </div>
 
@@ -103,7 +91,7 @@ export function ViewRequestsModal({
               borderColor: filter === "all" ? "var(--accent)" : "transparent",
             }}
           >
-            All ({requests.length})
+            All ({safeRequests.length})
           </button>
 
           <button
@@ -118,14 +106,14 @@ export function ViewRequestsModal({
           </button>
 
           <button
-            onClick={() => setFilter("interviewing")}
+            onClick={() => setFilter("rejected")}
             className="pb-2 text-[14px] border-b-2 transition-colors"
             style={{
-              color: filter === "interviewing" ? "var(--text)" : "var(--text-muted)",
-              borderColor: filter === "interviewing" ? "var(--accent)" : "transparent",
+              color: filter === "rejected" ? "var(--text)" : "var(--text-muted)",
+              borderColor: filter === "rejected" ? "var(--accent)" : "transparent",
             }}
           >
-            Interviewing ({interviewingCount})
+            Rejected ({rejectedCount})
           </button>
         </div>
 
@@ -145,7 +133,7 @@ export function ViewRequestsModal({
                   className="rounded-lg border transition-colors"
                   style={{
                     background: "var(--bg)",
-                    borderColor: selectedRequestId === request.id ? "var(--accent)" : "var(--border)",
+                    borderColor: "var(--border)",
                   }}
                 >
                   {/* Request Header */}
@@ -157,14 +145,14 @@ export function ViewRequestsModal({
                           className="w-12 h-12 rounded-full flex items-center justify-center text-[16px] flex-shrink-0"
                           style={{ background: "var(--accent)", color: "#ffffff" }}
                         >
-                          {request.freelancer.avatar}
+                          {request.freelancer?.avatar || "?"}
                         </div>
 
                         {/* Freelancer Info */}
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="text-[16px]" style={{ color: "var(--text)" }}>
-                              {request.freelancer.name}
+                              {request.freelancer?.name || "Unknown"}
                             </h3>
 
                             <span
@@ -181,73 +169,35 @@ export function ViewRequestsModal({
                                 key={star}
                                 className="w-3.5 h-3.5"
                                 style={{
-                                  color: star <= request.freelancer.rating ? "#f59e0b" : "var(--text-muted)",
+                                  color:
+                                    star <= (request.freelancer?.rating ?? 0)
+                                      ? "#f59e0b"
+                                      : "var(--text-muted)",
                                 }}
-                                fill={star <= request.freelancer.rating ? "currentColor" : "none"}
+                                fill={star <= (request.freelancer?.rating ?? 0) ? "currentColor" : "none"}
                               />
                             ))}
                             <span className="text-[12px] ml-1" style={{ color: "var(--text-muted)" }}>
-                              {request.freelancer.rating} ({request.freelancer.reviewCount} reviews)
+                              {request.freelancer?.rating ?? 0} ({request.freelancer?.reviewCount ?? 0} reviews)
                             </span>
                           </div>
 
                           <div className="flex items-center gap-4 text-[13px]" style={{ color: "var(--text-muted)" }}>
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3.5 h-3.5" />
-                              {request.freelancer.location}
-                            </span>
+                            {request.freelancer?.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3.5 h-3.5" />
+                                {request.freelancer.location}
+                              </span>
+                            )}
+                            {request.submittedTime && <span>• Submitted {request.submittedTime}</span>}
                           </div>
                         </div>
                       </div>
                     </div>
-
-                    {/* Stats */}
-                    <div className="flex gap-4 p-3 rounded-lg" style={{ background: "var(--panel-2)" }}>
-                      <div className="flex items-center gap-2">
-                        <ThumbsUp className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                        <div className="text-[13px]">
-                          <span style={{ color: "var(--text)" }}>{request.freelancer.successRate}%</span>
-                          <span style={{ color: "var(--text-muted)" }} className="ml-1">
-                            Success Rate
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-                        • Submitted {request.submittedTime}
-                      </div>
-                    </div>
                   </div>
 
-                  {/* Message / Cover Letter */}
+                  {/* Body */}
                   <div className="p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-[14px]" style={{ color: "var(--text)" }}>
-                        Message
-                      </h4>
-                      <button
-                        onClick={() =>
-                          setSelectedRequestId(selectedRequestId === request.id ? null : request.id)
-                        }
-                        className="text-[13px] hover:underline"
-                        style={{ color: "var(--accent)" }}
-                      >
-                        {selectedRequestId === request.id ? "Show less" : "Show more"}
-                      </button>
-                    </div>
-
-                    <p
-                      className="text-[14px] leading-relaxed mb-4"
-                      style={{
-                        color: "var(--text-muted)",
-                        display: "-webkit-box",
-                        WebkitLineClamp: selectedRequestId === request.id ? "unset" : 3,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {request.coverLetter}
-                    </p>
-
                     {/* Skills */}
                     {request.skills?.length > 0 && (
                       <div className="mb-4">
@@ -276,9 +226,9 @@ export function ViewRequestsModal({
                             className="flex-1 py-2.5 rounded-lg transition-colors text-[14px] flex items-center justify-center gap-2"
                             style={{ background: "var(--accent)", color: "#ffffff" }}
                             onClick={() => {
-                            onUpdateStatus(jobId, request.id, "accepted");
-                            onClose();
-                          }}                         
+                              onUpdateStatus(jobId, request.id, "accepted");
+                              onClose();
+                            }}
                           >
                             <ThumbsUp className="w-4 h-4" />
                             Accept Request
@@ -291,41 +241,17 @@ export function ViewRequestsModal({
                             <MessageSquare className="w-4 h-4" />
                             Message
                           </button>
-                        </>
-                      )}
-
-                      {request.status === "interviewing" && (
-                        <>
-                          <button
-                            className="flex-1 py-2.5 rounded-lg transition-colors text-[14px] flex items-center justify-center gap-2"
-                            style={{ background: "var(--accent)", color: "#ffffff" }}
-                            onClick={() => onUpdateStatus(jobId, request.id, "accepted")}
-                          >
-                            <ThumbsUp className="w-4 h-4" />
-                            Hire
-                          </button>
 
                           <button
-                            className="flex-1 py-2.5 rounded-lg transition-colors text-[14px] flex items-center justify-center gap-2"
-                            style={{ background: "var(--blue)", color: "#ffffff" }}
+                            className="px-4 py-2.5 rounded-lg border transition-colors text-[14px] flex items-center gap-2 hover:border-red-500"
+                            style={{ borderColor: "var(--border)", color: "var(--danger)" }}
+                            onClick={() => onUpdateStatus(jobId, request.id, "rejected")}
                           >
-                            <MessageSquare className="w-4 h-4" />
-                            Continue Conversation
+                            <ThumbsDown className="w-4 h-4" />
+                            Reject
                           </button>
                         </>
                       )}
-
-                      {request.status === "pending" && (
-                        <button
-                          className="px-4 py-2.5 rounded-lg border transition-colors text-[14px] flex items-center gap-2 hover:border-red-500"
-                          style={{ borderColor: "var(--border)", color: "var(--danger)" }}
-                          onClick={() => onUpdateStatus(jobId, request.id, "declined")}
-                        >
-                          <ThumbsDown className="w-4 h-4" />
-                          Decline
-                        </button>
-                      )}
-
                     </div>
                   </div>
                 </div>
@@ -340,7 +266,7 @@ export function ViewRequestsModal({
           style={{ borderColor: "var(--border)", background: "var(--bg)" }}
         >
           <div className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-            Showing {filteredRequests.length} of {requests.length} requests
+            Showing {filteredRequests.length} of {safeRequests.length} requests
           </div>
 
           <button
