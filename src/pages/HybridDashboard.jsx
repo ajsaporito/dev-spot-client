@@ -172,7 +172,7 @@ const initialOpenJobs = [
     ],
   },
 ];
-
+/*
 const initialJobsInProgress = [
   {
     id: 1,
@@ -196,7 +196,7 @@ const initialJobsInProgress = [
   },
 ];
 
-
+*/
 export function HybridDashboard() {
 
   /* FOR API DATA:
