@@ -3,9 +3,10 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { register } from "../api/auth";
+import { getUser, setUser } from "../api/client";
 import { uploadProfilePhoto } from "../services/upload";
 
-export function SignupPage({ onSwitchToLogin, onComplete }) {
+export function SignupPage({ onComplete }) {
   const nav = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -104,8 +105,14 @@ export function SignupPage({ onSwitchToLogin, onComplete }) {
       });
       
       if (formData.profilePhoto) {
-        await uploadProfilePhoto(formData.profilePhoto);
+        const uploaded = await uploadProfilePhoto(formData.profilePhoto); 
+        const me = getUser();
+
+        if (me && uploaded?.profilePicUrl) {
+          setUser({ ...me, profilePicUrl: uploaded.profilePicUrl });
+        }
       }
+
       nav("/dashboard");
     } catch (err) {
       setError(err.message || "Signup failed");
