@@ -22,9 +22,9 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    const onStorage = () => setMe(getUser());
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    const refresh = () => setMe(getUser());
+    window.addEventListener("devspot:user-changed", refresh);
+    return () => window.removeEventListener("devspot:user-changed", refresh);
   }, []);
 
   const handleLogout = () => {
@@ -32,9 +32,6 @@ const Navbar = () => {
     clearSession();
     navigate("/login");
   };
-
-  const linkClass = ({ isActive }) =>
-    `text-[14px] transition-colors ${isActive ? "font-semibold" : ""}`;
 
   return (
     <nav

@@ -1,5 +1,3 @@
-
-console.log("API_BASE =", import.meta.env.VITE_API_BASE_URL);
 const TOKEN_KEY = "devspot_token";
 const USER_KEY = "devspot_user";
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
@@ -18,6 +16,7 @@ export function clearToken() {
 
 export function setUser(user) {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+   window.dispatchEvent(new Event("devspot:user-changed"));
 }
 
 export function getUser() {
