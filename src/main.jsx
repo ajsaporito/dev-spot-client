@@ -36,6 +36,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="hire-talent" element={<HireTalentPage />} />
             <Route path="job/:id" element={<JobDetailPage />} />
             <Route path="messages" element={<MessagesPage />} />
+            <Route path="messages/:chatId" element={<MessagesPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="/talent/:talentId" element={<TalentProfilePage />} />
           </Route>

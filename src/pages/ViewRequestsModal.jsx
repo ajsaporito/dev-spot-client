@@ -1,49 +1,99 @@
-import { useState } from "react";
-import { X, Star, MapPin, MessageSquare, ThumbsUp, ThumbsDown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, User, ThumbsUp, ThumbsDown, MessageCircle, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { getRequestsForJob, updateRequestStatus } from "../services/requestsService";
+import { getOrCreateChat } from "../services/chatService";
 
-export function ViewRequestsModal({
-  isOpen,
-  onClose,
-  jobId,
-  jobTitle,
-  requests,
-  onUpdateStatus,
-}) {
+export function ViewRequestsModal({ isOpen, onClose, onAccepted, jobId, jobTitle }) {
+  const navigate = useNavigate();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [filter, setFilter] = useState("all"); // 'all' | 'pending' | 'rejected'
+  const [updatingId, setUpdatingId] = useState(null);
+  const [messagingId, setMessagingId] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen || !jobId) return;
+    let cancelled = false;
+    setError(null);
+    setLoading(true);
+    getRequestsForJob(jobId)
+      .then((data) => {
+        if (!cancelled) {
+          setRequests(Array.isArray(data) ? data : []);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || "Failed to load requests");
+          setLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [isOpen, jobId]);
 
   if (!isOpen) return null;
 
-  const safeRequests = requests || [];
+  const handleUpdateStatus = async (requestId, newStatus) => {
+    if (updatingId) return;
+    setUpdatingId(requestId);
+    try {
+      await updateRequestStatus(requestId, newStatus);
+      if (newStatus === "Accepted") {
+        onAccepted?.();
+        onClose();
+        return;
+      }
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
+      );
+    } catch (err) {
+      // surface error inline without crashing
+      setError(err.message || "Failed to update request");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
-  const filteredRequests = safeRequests.filter((r) => {
+  const handleMessage = async (request) => {
+    const userId = request.freelancerId ?? request.freelancerUserId ?? request.id;
+    setMessagingId(request.id);
+    try {
+      const chat = await getOrCreateChat(userId);
+      onClose();
+      navigate(`/messages/${chat.chatId}`);
+    } catch {
+      // silently ignore — user stays on modal
+    } finally {
+      setMessagingId(null);
+    }
+  };
+
+  const normalizeStatus = (s) => (s ? s.toLowerCase() : "pending");
+
+  const filteredRequests = requests.filter((r) => {
     if (filter === "all") return true;
-    return r.status === filter;
+    return normalizeStatus(r.status) === filter;
   });
 
+  const pendingCount = requests.filter((r) => normalizeStatus(r.status) === "pending").length;
+  const rejectedCount = requests.filter((r) => normalizeStatus(r.status) === "rejected").length;
+
   const getStatusColor = (status) => {
-    switch (status) {
-      case "accepted":
-        return "var(--accent)";
-      case "rejected":
-        return "var(--danger)";
-      default:
-        return "var(--text-muted)"; // pending (or unknown)
-    }
+    const s = normalizeStatus(status);
+    if (s === "accepted") return "var(--accent)";
+    if (s === "rejected") return "var(--danger, #ef4444)";
+    return "var(--text-muted)";
   };
 
   const getStatusText = (status) => {
-    switch (status) {
-      case "accepted":
-        return "Accepted";
-      case "rejected":
-        return "Rejected";
-      default:
-        return "Pending";
-    }
+    const s = normalizeStatus(status);
+    if (s === "accepted") return "Accepted";
+    if (s === "rejected") return "Rejected";
+    return "Pending";
   };
-
-  const pendingCount = safeRequests.filter((r) => r.status === "pending").length;
-  const rejectedCount = safeRequests.filter((r) => r.status === "rejected").length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -52,7 +102,7 @@ export function ViewRequestsModal({
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden flex flex-col"
+        className="relative w-full max-w-3xl max-h-[90vh] rounded-2xl overflow-hidden flex flex-col"
         style={{ background: "var(--panel)", boxShadow: "var(--shadow)" }}
       >
         {/* Header */}
@@ -65,10 +115,9 @@ export function ViewRequestsModal({
               Requests for: {jobTitle}
             </h2>
             <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-              {safeRequests.length} total {safeRequests.length === 1 ? "request" : "requests"}
+              {requests.length} total {requests.length === 1 ? "request" : "requests"}
             </p>
           </div>
-
           <button
             onClick={onClose}
             className="p-2 rounded-lg transition-colors hover:bg-opacity-10"
@@ -83,179 +132,156 @@ export function ViewRequestsModal({
           className="px-6 py-3 border-b flex gap-4 flex-shrink-0"
           style={{ borderColor: "var(--border)", background: "var(--bg)" }}
         >
-          <button
-            onClick={() => setFilter("all")}
-            className="pb-2 text-[14px] border-b-2 transition-colors"
-            style={{
-              color: filter === "all" ? "var(--text)" : "var(--text-muted)",
-              borderColor: filter === "all" ? "var(--accent)" : "transparent",
-            }}
-          >
-            All ({safeRequests.length})
-          </button>
-
-          <button
-            onClick={() => setFilter("pending")}
-            className="pb-2 text-[14px] border-b-2 transition-colors"
-            style={{
-              color: filter === "pending" ? "var(--text)" : "var(--text-muted)",
-              borderColor: filter === "pending" ? "var(--accent)" : "transparent",
-            }}
-          >
-            Pending ({pendingCount})
-          </button>
-
-          <button
-            onClick={() => setFilter("rejected")}
-            className="pb-2 text-[14px] border-b-2 transition-colors"
-            style={{
-              color: filter === "rejected" ? "var(--text)" : "var(--text-muted)",
-              borderColor: filter === "rejected" ? "var(--accent)" : "transparent",
-            }}
-          >
-            Rejected ({rejectedCount})
-          </button>
+          {[
+            { key: "all", label: `All (${requests.length})` },
+            { key: "pending", label: `Pending (${pendingCount})` },
+            { key: "rejected", label: `Rejected (${rejectedCount})` },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className="pb-2 text-[14px] border-b-2 transition-colors"
+              style={{
+                color: filter === key ? "var(--text)" : "var(--text-muted)",
+                borderColor: filter === key ? "var(--accent)" : "transparent",
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Content */}
         <div className="overflow-y-auto flex-1">
-          {filteredRequests.length === 0 ? (
+          {loading && (
+            <div className="p-12 text-center">
+              <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+                Loading requests…
+              </p>
+            </div>
+          )}
+
+          {!loading && error && (
+            <div className="p-12 text-center">
+              <p className="text-[14px]" style={{ color: "var(--danger, #ef4444)" }}>
+                {error}
+              </p>
+            </div>
+          )}
+
+          {!loading && !error && filteredRequests.length === 0 && (
             <div className="p-12 text-center">
               <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
                 No requests in this category
               </p>
             </div>
-          ) : (
+          )}
+
+          {!loading && !error && filteredRequests.length > 0 && (
             <div className="p-6 space-y-4">
-              {filteredRequests.map((request) => (
-                <div
-                  key={request.id}
-                  className="rounded-lg border transition-colors"
-                  style={{
-                    background: "var(--bg)",
-                    borderColor: "var(--border)",
-                  }}
-                >
-                  {/* Request Header */}
-                  <div className="p-5 border-b" style={{ borderColor: "var(--border)" }}>
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-start gap-3 flex-1">
-                        {/* Avatar */}
-                        <div
-                          className="w-12 h-12 rounded-full flex items-center justify-center text-[16px] flex-shrink-0"
-                          style={{ background: "var(--accent)", color: "#ffffff" }}
-                        >
-                          {request.freelancer?.avatar || "?"}
-                        </div>
+              {filteredRequests.map((request) => {
+                const statusNorm = normalizeStatus(request.status);
+                const isPending = statusNorm === "pending";
+                const isUpdating = updatingId === request.id;
 
-                        {/* Freelancer Info */}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-[16px]" style={{ color: "var(--text)" }}>
-                              {request.freelancer?.name || "Unknown"}
-                            </h3>
-
-                            <span
-                              className="px-2 py-0.5 rounded text-[11px]"
-                              style={{ background: "var(--panel-2)", color: getStatusColor(request.status) }}
+                return (
+                  <div
+                    key={request.id}
+                    className="rounded-lg border"
+                    style={{ background: "var(--bg)", borderColor: "var(--border)" }}
+                  >
+                    {/* Request Header */}
+                    <div className="p-5 border-b" style={{ borderColor: "var(--border)" }}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {request.freelancerProfilePicUrl ? (
+                            <img
+                              src={request.freelancerProfilePicUrl}
+                              alt={request.freelancerName}
+                              className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div
+                              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ background: "var(--panel-2)" }}
                             >
-                              {getStatusText(request.status)}
-                            </span>
-                          </div>
+                              <User className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
+                            </div>
+                          )}
 
-                          <div className="flex items-center gap-1 mb-2">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className="w-3.5 h-3.5"
-                                style={{
-                                  color:
-                                    star <= (request.freelancer?.rating ?? 0)
-                                      ? "#f59e0b"
-                                      : "var(--text-muted)",
-                                }}
-                                fill={star <= (request.freelancer?.rating ?? 0) ? "currentColor" : "none"}
-                              />
-                            ))}
-                            <span className="text-[12px] ml-1" style={{ color: "var(--text-muted)" }}>
-                              {request.freelancer?.rating ?? 0} ({request.freelancer?.reviewCount ?? 0} reviews)
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-4 text-[13px]" style={{ color: "var(--text-muted)" }}>
-                            {request.freelancer?.location && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-3.5 h-3.5" />
-                                {request.freelancer.location}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[15px]" style={{ color: "var(--text)" }}>
+                                {request.freelancerName || "Freelancer"}
                               </span>
+                              <span
+                                className="px-2 py-0.5 rounded text-[11px]"
+                                style={{
+                                  background: "var(--panel-2)",
+                                  color: getStatusColor(request.status),
+                                }}
+                              >
+                                {getStatusText(request.status)}
+                              </span>
+                            </div>
+                            {request.createdAt && (
+                              <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                                Submitted {new Date(request.createdAt).toLocaleDateString()}
+                              </p>
                             )}
-                            {request.submittedTime && <span>• Submitted {request.submittedTime}</span>}
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Body */}
-                  <div className="p-5">
-                    {/* Skills */}
-                    {request.skills?.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-[13px] mb-2" style={{ color: "var(--text-muted)" }}>
-                          Skills
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {request.skills.map((skill, index) => (
-                            <span
-                              key={index}
-                              className="px-3 py-1 rounded-full text-[12px]"
-                              style={{ background: "var(--panel-2)", color: "var(--text)" }}
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
 
                     {/* Actions */}
-                    <div className="flex gap-3 flex-wrap">
-                      {request.status === "pending" && (
+                    <div className="p-5 flex gap-3 flex-wrap">
+                      {isPending && (
                         <>
                           <button
-                            className="flex-1 py-2.5 rounded-lg transition-colors text-[14px] flex items-center justify-center gap-2"
+                            disabled={isUpdating}
+                            onClick={() => handleUpdateStatus(request.id, "Accepted")}
+                            className="flex-1 py-2.5 rounded-lg transition-colors text-[14px] flex items-center justify-center gap-2 disabled:opacity-50"
                             style={{ background: "var(--accent)", color: "#ffffff" }}
-                            onClick={() => {
-                              onUpdateStatus(jobId, request.id, "accepted");
-                              onClose();
-                            }}
                           >
                             <ThumbsUp className="w-4 h-4" />
-                            Accept Request
+                            Accept
                           </button>
-
                           <button
-                            className="px-4 py-2.5 rounded-lg transition-colors text-[14px] flex items-center gap-2"
-                            style={{ background: "var(--blue)", color: "#ffffff" }}
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                            Message
-                          </button>
-
-                          <button
-                            className="px-4 py-2.5 rounded-lg border transition-colors text-[14px] flex items-center gap-2 hover:border-red-500"
-                            style={{ borderColor: "var(--border)", color: "var(--danger)" }}
-                            onClick={() => onUpdateStatus(jobId, request.id, "rejected")}
+                            disabled={isUpdating}
+                            onClick={() => handleUpdateStatus(request.id, "Rejected")}
+                            className="px-4 py-2.5 rounded-lg border transition-colors text-[14px] flex items-center gap-2 hover:border-red-500 disabled:opacity-50"
+                            style={{ borderColor: "var(--border)", color: "var(--danger, #ef4444)" }}
                           >
                             <ThumbsDown className="w-4 h-4" />
                             Reject
                           </button>
                         </>
                       )}
+                      {statusNorm === "rejected" && (
+                        <button
+                          disabled={isUpdating}
+                          onClick={() => handleUpdateStatus(request.id, "Pending")}
+                          className="px-4 py-2.5 rounded-lg border transition-colors text-[14px] flex items-center gap-2 disabled:opacity-50"
+                          style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                        >
+                          <Clock className="w-4 h-4" />
+                          Pend
+                        </button>
+                      )}
+                      <button
+                        disabled={messagingId === request.id}
+                        onClick={() => handleMessage(request)}
+                        className="px-4 py-2.5 rounded-lg transition-colors text-[14px] flex items-center gap-2 disabled:opacity-50"
+                        style={{ background: "#3b82f6", color: "#ffffff" }}
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        Message
+                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -266,9 +292,8 @@ export function ViewRequestsModal({
           style={{ borderColor: "var(--border)", background: "var(--bg)" }}
         >
           <div className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-            Showing {filteredRequests.length} of {safeRequests.length} requests
+            Showing {filteredRequests.length} of {requests.length} requests
           </div>
-
           <button
             onClick={onClose}
             className="px-6 py-2.5 rounded-lg border transition-colors text-[14px]"
