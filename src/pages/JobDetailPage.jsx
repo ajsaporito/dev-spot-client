@@ -1,59 +1,130 @@
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   ArrowLeft,
-  MapPin,
-  Calendar,
   Clock,
   DollarSign,
-  Star,
-  CheckCircle,
-  Heart,
-  Flag,
-  Share2,
-  Briefcase,
   Award,
+  Briefcase,
+  Trash2,
 } from "lucide-react";
 
-import { mockJobs } from "../data/mockJobs";
+import { getJob, deleteJob } from "../services/jobsService";
+import { createRequest } from "../services/requestsService";
+import { ViewRequestsModal } from "./ViewRequestsModal.jsx";
 
 export function JobDetailPage() {
   const navigate = useNavigate();
-  const { id } = useParams(); // string
-  const jobId = Number(id);
+  const { id } = useParams();
 
-  const [isSaved, setIsSaved] = useState(false);
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [applied, setApplied] = useState(false);
 
-  // Find the matching job by id
-  const job = useMemo(() => {
-    const found = mockJobs.find((j) => Number(j.id) === jobId);
-    return found || null;
-  }, [jobId]);
+  // Requests modal (visible when current user is the job owner)
+  const [isRequestsOpen, setIsRequestsOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getJob(id)
+      .then((data) => {
+        if (!cancelled) {
+          setJob(data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || "Failed to load job");
+          setLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [id]);
 
   const handleApply = async () => {
-    if (!job) return;
-    if (isSubmitting) return;
-
+    if (!job || isSubmitting || applied) return;
     setIsSubmitting(true);
-
     try {
-      // TODO: replace with real API call:
-      // await api.createJobRequest({ jobId: job.id });
-
-      await new Promise((r) => setTimeout(r, 600)); // fake delay
+      await createRequest(job.id);
+      setApplied(true);
       toast.success("Request sent! The client will be notified.");
     } catch (err) {
-      toast.error("Couldn’t send request. Please try again.");
-      console.error(err);
+      const msg = err.message || "";
+      if (msg.startsWith("401") || msg.startsWith("403")) {
+        toast.error("Please log in to apply.");
+      } else {
+        toast.error("Couldn't send request. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Not found state
-  if (!job) {
+  const handleDelete = async () => {
+    if (isDeleting) return;
+    if (!window.confirm("Are you sure you want to delete this job? This cannot be undone.")) return;
+    setIsDeleting(true);
+    try {
+      await deleteJob(job.id);
+      toast.success("Job deleted.");
+      navigate("/dashboard");
+    } catch (err) {
+      toast.error(err.message || "Failed to delete job.");
+      setIsDeleting(false);
+    }
+  };
+
+  // Check if current user owns this job
+  const currentUserId = (() => {
+    try {
+      const raw = localStorage.getItem("devspot_user");
+      if (!raw) return null;
+      const u = JSON.parse(raw);
+      return u?.id ?? u?.userId ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  const isOwner = job && currentUserId && String(job.clientId) === String(currentUserId);
+
+  const durationLabel = (d) => {
+    if (d === 0) return "< 1 month";
+    if (d === 1) return "1–3 months";
+    if (d === 2) return "3–6 months";
+    if (d === 3) return "> 6 months";
+    return null;
+  };
+
+  const experienceLabel = (l) => {
+    if (l === 0) return "Entry Level";
+    if (l === 1) return "Intermediate";
+    if (l === 2) return "Expert";
+    return null;
+  };
+
+  const payTypeLabel = (t) => {
+    if (t === 0) return "Hourly";
+    if (t === 1) return "Fixed";
+    return null;
+  };
+
+  // Loading / error states
+  if (loading) {
+    return (
+      <div className="min-h-screen" style={{ background: "var(--bg)" }}>
+        <div className="max-w-5xl mx-auto px-6 py-10">
+          <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !job) {
     return (
       <div className="min-h-screen" style={{ background: "var(--bg)" }}>
         <div className="max-w-5xl mx-auto px-6 py-10">
@@ -65,18 +136,16 @@ export function JobDetailPage() {
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-
           <div
             className="rounded-lg border p-6"
             style={{ background: "var(--panel)", borderColor: "var(--border)" }}
           >
             <h1 className="text-[22px] mb-2" style={{ color: "var(--text)" }}>
-              Job not found
+              {error ? "Error loading job" : "Job not found"}
             </h1>
             <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
-              This job may have been removed or the link is incorrect.
+              {error || "This job may have been removed or the link is incorrect."}
             </p>
-
             <div className="mt-5">
               <Link
                 to="/find-jobs"
@@ -92,27 +161,15 @@ export function JobDetailPage() {
     );
   }
 
-  // Normalize a few fields so it works even if some properties differ per mock job
-  const displayBudget =
-    job.budget ||
-    job.hourlyRange ||
-    job.rate ||
-    (job.budgetType === "Hourly" ? "Hourly" : "Fixed");
-
-  const displayBudgetType = job.budgetType || job.type || "Budget";
-  const displayExpertise = job.expertiseLevel || job.experience || "Any level";
-  const displayDuration =
-    job.estimatedDuration || job.projectLength || job.estimatedTime || "—";
-  const displayWeeklyHours = job.weeklyHours || "—";
-  const displayPostedTime = job.postedTime || "—";
-  const displayLocation = job.location || "—";
-  const locationRestricted = Boolean(job.locationRestricted);
   const skills = Array.isArray(job.skills) ? job.skills : [];
+  const durLabel = durationLabel(job.duration);
+  const expLabel = experienceLabel(job.experienceLevel);
+  const typeLabel = payTypeLabel(job.payType);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)" }}>
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Top back link */}
+        {/* Back link */}
         <button
           onClick={() => navigate(-1)}
           className="inline-flex items-center gap-2 text-[14px] mb-6 hover:underline"
@@ -130,200 +187,120 @@ export function JobDetailPage() {
               className="rounded-lg border p-6"
               style={{ background: "var(--panel)", borderColor: "var(--border)" }}
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h1 className="text-[28px] mb-3" style={{ color: "var(--text)" }}>
-                    {job.title}
-                  </h1>
-
-                  <div
-                    className="flex items-center gap-4 text-[13px] mb-4"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      Posted {displayPostedTime}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {displayLocation}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setIsSaved((v) => !v)}
-                    className="p-2.5 rounded-lg transition-colors"
-                    style={{
-                      background: isSaved ? "var(--accent)" : "var(--panel-2)",
-                      color: isSaved ? "#ffffff" : "var(--text-muted)",
-                    }}
-                    title={isSaved ? "Saved" : "Save job"}
-                  >
-                    <Heart className="w-5 h-5" fill={isSaved ? "currentColor" : "none"} />
-                  </button>
-
-                  <button
-                    className="p-2.5 rounded-lg transition-colors"
-                    style={{ background: "var(--panel-2)", color: "var(--text-muted)" }}
-                    title="Share"
-                    onClick={() => toast("Share link copied (mock)")}
-                  >
-                    <Share2 className="w-5 h-5" />
-                  </button>
-
-                  <button
-                    className="p-2.5 rounded-lg transition-colors"
-                    style={{ background: "var(--panel-2)", color: "var(--text-muted)" }}
-                    title="Report"
-                    onClick={() => toast("Reported (mock)")}
-                  >
-                    <Flag className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
+              <h1 className="text-[28px] mb-6" style={{ color: "var(--text)" }}>
+                {job.title}
+              </h1>
 
               {/* Job Meta Info */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div>
-                  <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-                    Budget
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                {(typeLabel || job.budget != null) && (
+                  <div>
+                    <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
+                      Budget
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4" style={{ color: "var(--accent)" }} />
+                      <span className="text-[15px]" style={{ color: "var(--text)" }}>
+                        {job.budget != null ? `$${job.budget}` : "—"}
+                      </span>
+                    </div>
+                    {typeLabel && (
+                      <div className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                        {typeLabel}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <DollarSign className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                    <span className="text-[15px]" style={{ color: "var(--text)" }}>
-                      {displayBudget}
-                    </span>
-                  </div>
-                  <div className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                    {displayBudgetType}
-                  </div>
-                </div>
+                )}
 
-                <div>
-                  <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-                    Experience Level
+                {expLabel && (
+                  <div>
+                    <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
+                      Experience Level
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Award className="w-4 h-4" style={{ color: "var(--accent)" }} />
+                      <span className="text-[15px]" style={{ color: "var(--text)" }}>
+                        {expLabel}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Award className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                    <span className="text-[15px]" style={{ color: "var(--text)" }}>
-                      {displayExpertise}
-                    </span>
-                  </div>
-                </div>
+                )}
 
-                <div>
-                  <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-                    Duration
+                {durLabel && (
+                  <div>
+                    <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
+                      Duration
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4" style={{ color: "var(--accent)" }} />
+                      <span className="text-[15px]" style={{ color: "var(--text)" }}>
+                        {durLabel}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                    <span className="text-[15px]" style={{ color: "var(--text)" }}>
-                      {displayDuration}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-                    Time Commitment
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Briefcase className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                    <span className="text-[15px]" style={{ color: "var(--text)" }}>
-                      {displayWeeklyHours}
-                    </span>
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Location Restriction */}
-              {locationRestricted && (
-                <div
-                  className="flex items-start gap-2 p-3 rounded-lg mb-4"
-                  style={{ background: "var(--panel-2)" }}
-                >
-                  <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "var(--accent)" }} />
-                  <span className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-                    Only freelancers located in the {displayLocation} may apply
-                  </span>
-                </div>
-              )}
-
-              {/* Apply Button */}
-              <button
-                onClick={handleApply}
-                disabled={isSubmitting}
-                className="w-full py-3 rounded-lg transition-opacity text-[15px] disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{ background: "var(--accent)", color: "#ffffff" }}
-              >
-                {isSubmitting ? "Sending Request..." : "Apply Now"}
-              </button>
+              {/* Action buttons */}
+              <div className="flex gap-3">
+                {isOwner ? (
+                  <>
+                    <button
+                      onClick={() => setIsRequestsOpen(true)}
+                      className="flex-1 py-3 rounded-lg transition-opacity text-[15px] hover:opacity-90"
+                      style={{ background: "var(--accent)", color: "#ffffff" }}
+                    >
+                      <Briefcase className="w-4 h-4 inline mr-2" />
+                      View Requests
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="py-3 px-5 rounded-lg border text-[15px] transition-colors hover:opacity-90 disabled:opacity-50"
+                      style={{ borderColor: "var(--border)", color: "var(--danger, #ef4444)" }}
+                    >
+                      <Trash2 className="w-4 h-4 inline mr-2" />
+                      {isDeleting ? "Deleting…" : "Delete"}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleApply}
+                    disabled={isSubmitting || applied}
+                    className="flex-1 py-3 rounded-lg transition-opacity text-[15px] disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ background: "var(--accent)", color: "#ffffff" }}
+                  >
+                    {applied
+                      ? "Request Sent"
+                      : isSubmitting
+                      ? "Sending Request…"
+                      : "Apply Now"}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Description */}
-            <div
-              className="rounded-lg border p-6"
-              style={{ background: "var(--panel)", borderColor: "var(--border)" }}
-            >
-              <h2 className="text-[20px] mb-4" style={{ color: "var(--text)" }}>
-                Job Description
-              </h2>
+            {job.description && (
               <div
-                className="text-[14px] leading-relaxed whitespace-pre-line"
-                style={{ color: "var(--text-muted)" }}
+                className="rounded-lg border p-6"
+                style={{ background: "var(--panel)", borderColor: "var(--border)" }}
               >
-                {job.fullDescription || job.description || "No description provided."}
+                <h2 className="text-[20px] mb-4" style={{ color: "var(--text)" }}>
+                  Job Description
+                </h2>
+                <div
+                  className="text-[14px] leading-relaxed whitespace-pre-line"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {job.description}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-
-            {/* Project Details */}
-            <div
-              className="rounded-lg border p-6"
-              style={{ background: "var(--panel)", borderColor: "var(--border)" }}
-            >
-              <h3 className="text-[16px] mb-4" style={{ color: "var(--text)" }}>
-                Project Details
-              </h3>
-
-              <div className="space-y-3">
-                <div>
-                  <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-                    Project Type
-                  </div>
-                  <div className="text-[14px]" style={{ color: "var(--text)" }}>
-                    {job.projectType || job.projectTypeLabel || "One-time project"}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-                    Project Length
-                  </div>
-                  <div className="text-[14px]" style={{ color: "var(--text)" }}>
-                    {job.projectLength || displayDuration}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-                    Experience Level
-                  </div>
-                  <div className="text-[14px]" style={{ color: "var(--text)" }}>
-                    {displayExpertise}
-                  </div>
-                </div>
-
-                
-              </div>
-            </div>
-
             {/* Skills */}
             <div
               className="rounded-lg border p-6"
@@ -332,7 +309,6 @@ export function JobDetailPage() {
               <h2 className="text-[20px] mb-4" style={{ color: "var(--text)" }}>
                 Skills Required
               </h2>
-
               {skills.length === 0 ? (
                 <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
                   No skills listed.
@@ -354,6 +330,16 @@ export function JobDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Requests modal (owner only) */}
+      {isOwner && (
+        <ViewRequestsModal
+          isOpen={isRequestsOpen}
+          onClose={() => setIsRequestsOpen(false)}
+          jobId={job.id}
+          jobTitle={job.title}
+        />
+      )}
     </div>
   );
 }

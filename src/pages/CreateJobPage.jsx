@@ -1,23 +1,34 @@
-import {
-  Plus,
-  Search,
-  X,
-  DollarSign,
-  Clock,
-  Briefcase,
-  MessageSquare,
-  Bell,
-  Upload,
-} from "lucide-react";
+import { X, DollarSign, Clock, Briefcase, Upload } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import { createJob } from "../services/jobsService";
+
+const DURATION_MAP = {
+  "less-than-1month": 0,
+  "1-3months": 1,
+  "3-6months": 2,
+  "more-than-6months": 3,
+};
+
+const EXPERIENCE_MAP = {
+  entry: 0,
+  intermediate: 1,
+  expert: 2,
+};
 
 export function CreateJobPage() {
+  const navigate = useNavigate();
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [projectType, setProjectType] = useState("fixed"); // 'fixed' | 'hourly'
+  const [budget, setBudget] = useState("");
   const [experienceLevel, setExperienceLevel] = useState("intermediate");
   const [skillInput, setSkillInput] = useState("");
   const [skills, setSkills] = useState([]);
   const [duration, setDuration] = useState("1-3months");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const addSkill = () => {
     const trimmed = skillInput.trim();
@@ -28,7 +39,7 @@ export function CreateJobPage() {
   };
 
   const removeSkill = (skillToRemove) => {
-    setSkills(skills.filter((skill) => skill !== skillToRemove));
+    setSkills(skills.filter((s) => s !== skillToRemove));
   };
 
   const handleKeyDown = (e) => {
@@ -38,10 +49,44 @@ export function CreateJobPage() {
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    const dto = {
+      title: title.trim(),
+      description: description.trim(),
+      skills: [...new Set(skills.map((s) => s.trim()).filter(Boolean))],
+      payType: projectType === "hourly" ? 0 : 1,
+      budget: budget !== "" ? Number(budget) : null,
+      duration: DURATION_MAP[duration] ?? 1,
+      experienceLevel: EXPERIENCE_MAP[experienceLevel] ?? 1,
+    };
+
+    setIsSubmitting(true);
+    try {
+      const result = await createJob(dto);
+      toast.success("Job posted successfully!");
+      const newId = result?.id ?? result?.jobId;
+      if (newId) {
+        navigate(`/job/${newId}`);
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      const msg = err.message || "";
+      if (msg.startsWith("401") || msg.startsWith("403")) {
+        toast.error("Please log in to post a job.");
+      } else {
+        toast.error("Failed to post job. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)" }}>
-     
-      {/* Main Content */}
       <div className="max-w-[900px] mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -54,15 +99,11 @@ export function CreateJobPage() {
         </div>
 
         {/* Form */}
-        <form className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Job Title */}
           <div
             className="p-6 rounded-[14px] border space-y-4"
-            style={{
-              background: "var(--panel)",
-              borderColor: "var(--border)",
-              boxShadow: "var(--shadow)",
-            }}
+            style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "var(--shadow)" }}
           >
             <div>
               <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
@@ -70,13 +111,12 @@ export function CreateJobPage() {
               </label>
               <input
                 type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Build a responsive e-commerce website"
+                required
                 className="w-full px-4 py-2.5 rounded-lg border outline-none transition-colors text-[14px]"
-                style={{
-                  background: "var(--panel-2)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
+                style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
               />
             </div>
           </div>
@@ -84,38 +124,28 @@ export function CreateJobPage() {
           {/* Job Description */}
           <div
             className="p-6 rounded-[14px] border space-y-4"
-            style={{
-              background: "var(--panel)",
-              borderColor: "var(--border)",
-              boxShadow: "var(--shadow)",
-            }}
+            style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "var(--shadow)" }}
           >
             <div>
               <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
                 Job Description <span style={{ color: "var(--accent)" }}>*</span>
               </label>
               <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe your project in detail. Include what you're looking for, project requirements, deliverables, etc."
                 rows={8}
+                required
                 className="w-full px-4 py-2.5 rounded-lg border outline-none transition-colors text-[14px] resize-none"
-                style={{
-                  background: "var(--panel-2)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
+                style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
               />
             </div>
           </div>
 
-
           {/* Skills Required */}
           <div
             className="p-6 rounded-[14px] border space-y-4"
-            style={{
-              background: "var(--panel)",
-              borderColor: "var(--border)",
-              boxShadow: "var(--shadow)",
-            }}
+            style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "var(--shadow)" }}
           >
             <div>
               <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
@@ -129,11 +159,7 @@ export function CreateJobPage() {
                   onKeyDown={handleKeyDown}
                   placeholder="Type a skill and press Enter"
                   className="flex-1 px-4 py-2.5 rounded-lg border outline-none transition-colors text-[14px]"
-                  style={{
-                    background: "var(--panel-2)",
-                    borderColor: "var(--border)",
-                    color: "var(--text)",
-                  }}
+                  style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
                 />
                 <button
                   type="button"
@@ -154,11 +180,7 @@ export function CreateJobPage() {
                       style={{ background: "var(--panel-2)", color: "var(--text)" }}
                     >
                       {skill}
-                      <button
-                        type="button"
-                        onClick={() => removeSkill(skill)}
-                        className="hover:opacity-70"
-                      >
+                      <button type="button" onClick={() => removeSkill(skill)} className="hover:opacity-70">
                         <X className="w-3 h-3" />
                       </button>
                     </span>
@@ -173,11 +195,7 @@ export function CreateJobPage() {
             {/* Budget */}
             <div
               className="p-6 rounded-[14px] border space-y-4"
-              style={{
-                background: "var(--panel)",
-                borderColor: "var(--border)",
-                boxShadow: "var(--shadow)",
-              }}
+              style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "var(--shadow)" }}
             >
               <div>
                 <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
@@ -221,13 +239,12 @@ export function CreateJobPage() {
                   />
                   <input
                     type="number"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
                     placeholder={projectType === "fixed" ? "Enter budget" : "Hourly rate"}
+                    min="0"
                     className="w-full pl-10 pr-4 py-2.5 rounded-lg border outline-none transition-colors text-[14px]"
-                    style={{
-                      background: "var(--panel-2)",
-                      borderColor: "var(--border)",
-                      color: "var(--text)",
-                    }}
+                    style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
                   />
                 </div>
               </div>
@@ -236,11 +253,7 @@ export function CreateJobPage() {
             {/* Project Duration */}
             <div
               className="p-6 rounded-[14px] border space-y-4"
-              style={{
-                background: "var(--panel)",
-                borderColor: "var(--border)",
-                boxShadow: "var(--shadow)",
-              }}
+              style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "var(--shadow)" }}
             >
               <div>
                 <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
@@ -250,11 +263,7 @@ export function CreateJobPage() {
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border outline-none transition-colors text-[14px]"
-                  style={{
-                    background: "var(--panel-2)",
-                    borderColor: "var(--border)",
-                    color: "var(--text)",
-                  }}
+                  style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
                 >
                   <option value="less-than-1month">Less than 1 month</option>
                   <option value="1-3months">1-3 months</option>
@@ -268,73 +277,41 @@ export function CreateJobPage() {
           {/* Experience Level */}
           <div
             className="p-6 rounded-[14px] border space-y-4"
-            style={{
-              background: "var(--panel)",
-              borderColor: "var(--border)",
-              boxShadow: "var(--shadow)",
-            }}
+            style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "var(--shadow)" }}
           >
             <div>
               <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
                 Experience Level <span style={{ color: "var(--accent)" }}>*</span>
               </label>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setExperienceLevel("entry")}
-                  className="px-4 py-3 rounded-lg border transition-all text-left"
-                  style={{
-                    background: experienceLevel === "entry" ? "var(--accent)" : "var(--panel-2)",
-                    borderColor: experienceLevel === "entry" ? "var(--accent)" : "var(--border)",
-                    color: experienceLevel === "entry" ? "#ffffff" : "var(--text)",
-                  }}
-                >
-                  <div className="text-[14px]">Entry Level</div>
-                  <div className="text-[12px] opacity-70">New freelancers</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setExperienceLevel("intermediate")}
-                  className="px-4 py-3 rounded-lg border transition-all text-left"
-                  style={{
-                    background:
-                      experienceLevel === "intermediate" ? "var(--accent)" : "var(--panel-2)",
-                    borderColor:
-                      experienceLevel === "intermediate" ? "var(--accent)" : "var(--border)",
-                    color: experienceLevel === "intermediate" ? "#ffffff" : "var(--text)",
-                  }}
-                >
-                  <div className="text-[14px]">Intermediate</div>
-                  <div className="text-[12px] opacity-70">Some experience</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setExperienceLevel("expert")}
-                  className="px-4 py-3 rounded-lg border transition-all text-left"
-                  style={{
-                    background: experienceLevel === "expert" ? "var(--accent)" : "var(--panel-2)",
-                    borderColor: experienceLevel === "expert" ? "var(--accent)" : "var(--border)",
-                    color: experienceLevel === "expert" ? "#ffffff" : "var(--text)",
-                  }}
-                >
-                  <div className="text-[14px]">Expert</div>
-                  <div className="text-[12px] opacity-70">Highly experienced</div>
-                </button>
+                {[
+                  { value: "entry", label: "Entry Level", sub: "New freelancers" },
+                  { value: "intermediate", label: "Intermediate", sub: "Some experience" },
+                  { value: "expert", label: "Expert", sub: "Highly experienced" },
+                ].map(({ value, label, sub }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setExperienceLevel(value)}
+                    className="px-4 py-3 rounded-lg border transition-all text-left"
+                    style={{
+                      background: experienceLevel === value ? "var(--accent)" : "var(--panel-2)",
+                      borderColor: experienceLevel === value ? "var(--accent)" : "var(--border)",
+                      color: experienceLevel === value ? "#ffffff" : "var(--text)",
+                    }}
+                  >
+                    <div className="text-[14px]">{label}</div>
+                    <div className="text-[12px] opacity-70">{sub}</div>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Attachments (Optional) */}
+          {/* Attachments (UI-only, no upload endpoint) */}
           <div
             className="p-6 rounded-[14px] border space-y-4"
-            style={{
-              background: "var(--panel)",
-              borderColor: "var(--border)",
-              boxShadow: "var(--shadow)",
-            }}
+            style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "var(--shadow)" }}
           >
             <div>
               <label className="block text-[14px] mb-2" style={{ color: "var(--text)" }}>
@@ -343,9 +320,8 @@ export function CreateJobPage() {
                   (Optional)
                 </span>
               </label>
-
               <div
-                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors hover:border-opacity-60"
+                className="border-2 border-dashed rounded-lg p-8 text-center"
                 style={{ borderColor: "var(--border)" }}
               >
                 <Upload className="w-8 h-8 mx-auto mb-3" style={{ color: "var(--text-muted)" }} />
@@ -362,23 +338,13 @@ export function CreateJobPage() {
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <button
-              type="button"
-              className="px-6 py-3 rounded-lg border transition-colors text-[14px]"
-              style={{
-                background: "var(--panel-2)",
-                borderColor: "var(--border)",
-                color: "var(--text)",
-              }}
-            >
-              Save as Draft
-            </button>
-            <button
               type="submit"
-              className="flex-1 px-6 py-3 rounded-lg transition-opacity hover:opacity-90 text-[14px]"
+              disabled={isSubmitting}
+              className="flex-1 px-6 py-3 rounded-lg transition-opacity hover:opacity-90 text-[14px] disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ background: "var(--accent)", color: "#ffffff" }}
             >
               <Briefcase className="w-4 h-4 inline mr-2" />
-              Post Job
+              {isSubmitting ? "Posting…" : "Post Job"}
             </button>
           </div>
         </form>
