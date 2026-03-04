@@ -1,19 +1,3 @@
-
-
-//place holder content here for messages page until we implement the actual messaging functionality
-/*
-export default function MessagesPage() {
-  return (
-    <div className="min-h-screen p-6" style={{ color: "var(--text)" }}>
-      <h1 className="text-[28px] mb-2">Messages</h1>
-      <p style={{ color: "var(--text-muted)" }}>
-        View your messages here
-      </p>
-    </div>
-  );
-}*/
-
-
 import {
   Search,
   MoreVertical,
@@ -32,99 +16,14 @@ import {
   Briefcase,
   DollarSign,
   FileText,
-  Image as ImageIcon,
-  File,
-  Download,
   X,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Loader2,
 } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
-// Set to empty array to show empty state, or populate with conversations
-const mockConversations = [];
-
-const mockMessages = [
-  {
-    id: "1",
-    sender: "Scary Nemo",
-    content: "Hi! I wanted to discuss the Facebook Ads campaign performance for this month.",
-    timestamp: "10:30 AM",
-    isOwn: false,
-    read: true
-  },
-  {
-    id: "2",
-    sender: "You",
-    content: "Hello! Of course, I'd be happy to discuss. The campaign has been performing really well this month.",
-    timestamp: "10:32 AM",
-    isOwn: true,
-    read: true
-  },
-  {
-    id: "3",
-    sender: "You",
-    content: "We achieved a 4.2x ROAS with a 35% decrease in cost per acquisition compared to last month.",
-    timestamp: "10:32 AM",
-    isOwn: true,
-    read: true
-  },
-  {
-    id: "4",
-    sender: "Scary Nemo",
-    content: "That's fantastic! What changes did you make to achieve these results?",
-    timestamp: "10:35 AM",
-    isOwn: false,
-    read: true
-  },
-  {
-    id: "5",
-    sender: "You",
-    content:
-      "I optimized the audience targeting, refined the ad creative, and implemented a new bidding strategy focused on conversions rather than clicks.",
-    timestamp: "10:38 AM",
-    isOwn: true,
-    read: true
-  },
-  {
-    id: "6",
-    sender: "You",
-    content: "Here's the detailed analytics report for your review.",
-    timestamp: "10:39 AM",
-    isOwn: true,
-    read: true,
-    attachment: {
-      type: "file",
-      name: "Facebook_Ads_Analytics_October_2024.pdf",
-      url: "#",
-      size: "2.4 MB"
-    }
-  },
-  {
-    id: "7",
-    sender: "Scary Nemo",
-    content:
-      "Perfect! I'll review it and get back to you. Also, can you prepare a similar strategy for our Instagram campaigns?",
-    timestamp: "10:45 AM",
-    isOwn: false,
-    read: true
-  },
-  {
-    id: "8",
-    sender: "You",
-    content: "Absolutely! I'll draft a comprehensive Instagram strategy and share it with you by end of day.",
-    timestamp: "10:47 AM",
-    isOwn: true,
-    read: true
-  },
-  {
-    id: "9",
-    sender: "Scary Nemo",
-    content: "Thanks for the update on the campaign. Can you send the analytics report?",
-    timestamp: "Just now",
-    isOwn: false,
-    read: false
-  }
-];
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { getConversations, getMessages, sendMessage } from "../services/chatService";
+import { getChatConnection } from "../lib/chatConnection";
 
 const mockNotifications = [
   {
@@ -134,7 +33,7 @@ const mockNotifications = [
     description: "Thanks for the update on the campaign. Can you send the analytics report?",
     timestamp: "2 minutes ago",
     read: false,
-    icon: "message"
+    icon: "message",
   },
   {
     id: "2",
@@ -143,7 +42,7 @@ const mockNotifications = [
     description: 'You received $5,250.00 for "Facebook & Google Ads Management"',
     timestamp: "1 hour ago",
     read: false,
-    icon: "dollar"
+    icon: "dollar",
   },
   {
     id: "3",
@@ -152,7 +51,7 @@ const mockNotifications = [
     description: 'Sarah Johnson invited you to "E-commerce Marketing Campaign"',
     timestamp: "3 hours ago",
     read: true,
-    icon: "briefcase"
+    icon: "briefcase",
   },
   {
     id: "4",
@@ -161,7 +60,7 @@ const mockNotifications = [
     description: 'Milestone 2 of 4 for "Brand Identity Design" has been approved',
     timestamp: "5 hours ago",
     read: true,
-    icon: "check"
+    icon: "check",
   },
   {
     id: "5",
@@ -170,7 +69,7 @@ const mockNotifications = [
     description: "I've completed the logo variations. Ready for your review.",
     timestamp: "3 hours ago",
     read: true,
-    icon: "message"
+    icon: "message",
   },
   {
     id: "6",
@@ -179,7 +78,7 @@ const mockNotifications = [
     description: 'Your proposal for "Mobile App Development" was accepted',
     timestamp: "Yesterday",
     read: true,
-    icon: "briefcase"
+    icon: "briefcase",
   },
   {
     id: "7",
@@ -188,7 +87,7 @@ const mockNotifications = [
     description: "Your profile has been viewed 100 times this week!",
     timestamp: "Yesterday",
     read: true,
-    icon: "alert"
+    icon: "alert",
   },
   {
     id: "8",
@@ -197,24 +96,244 @@ const mockNotifications = [
     description: 'Contract for "SEO Optimization" is now active',
     timestamp: "2 days ago",
     read: true,
-    icon: "file"
-  }
+    icon: "file",
+  },
 ];
 
 export function MessagesPage() {
-  const [viewMode, setViewMode] = useState("messages"); // 'messages' | 'notifications'
-  const [selectedConversation, setSelectedConversation] = useState(null); // string | null
+  const { chatId: urlChatId } = useParams();
+  const navigate = useNavigate();
+  const [viewMode, setViewMode] = useState("messages");
+  const [conversations, setConversations] = useState([]);
+  const [selectedChatId, setSelectedChatId] = useState(urlChatId ? Number(urlChatId) : null);
+  const [messages, setMessages] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [messageInput, setMessageInput] = useState("");
   const [showConversationInfo, setShowConversationInfo] = useState(false);
+  const [loadingConvos, setLoadingConvos] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
 
-  const selectedConv = selectedConversation
-    ? mockConversations.find((c) => c.id === selectedConversation)
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const connectionRef = useRef(null);
+  const joinedChatRef = useRef(null);
+
+  // Load conversations on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getConversations();
+        if (!cancelled) setConversations(data || []);
+      } catch (err) {
+        console.error("Failed to load conversations:", err);
+      } finally {
+        if (!cancelled) setLoadingConvos(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Sync URL param → selectedChatId
+  useEffect(() => {
+    if (urlChatId) setSelectedChatId(Number(urlChatId));
+  }, [urlChatId]);
+
+  // Load messages when selectedChatId changes
+  useEffect(() => {
+    if (!selectedChatId) {
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingMessages(true);
+      setHasMoreMessages(true);
+      try {
+        const data = await getMessages(selectedChatId);
+        if (!cancelled) setMessages(data || []);
+      } catch (err) {
+        console.error("Failed to load messages:", err);
+      } finally {
+        if (!cancelled) setLoadingMessages(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedChatId]);
+
+  // Scroll to bottom when messages load or new message arrives
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // SignalR: connect, join/leave chat groups, listen for messages
+  useEffect(() => {
+    const conn = getChatConnection();
+    connectionRef.current = conn;
+
+    const startConnection = async () => {
+      if (conn.state === "Disconnected") {
+        try {
+          await conn.start();
+        } catch (err) {
+          console.error("SignalR connection failed:", err);
+        }
+      }
+    };
+
+    conn.on("ReceiveMessage", (msg) => {
+      // Append to messages if we're viewing the relevant chat
+      if (msg.chatId === selectedChatId) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.messageId === msg.messageId)) return prev;
+          return [...prev, msg];
+        });
+      }
+      // Update conversation list preview
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.chatId === msg.chatId
+            ? { ...c, lastMessage: msg.text, lastMessageAt: msg.createdAt }
+            : c
+        )
+      );
+    });
+
+    startConnection();
+
+    return () => {
+      conn.off("ReceiveMessage");
+    };
+  }, [selectedChatId]);
+
+  // Join / leave SignalR chat groups
+  useEffect(() => {
+    const conn = connectionRef.current;
+    if (!conn || conn.state !== "Connected") return;
+
+    const joinChat = async () => {
+      if (joinedChatRef.current) {
+        await conn.invoke("LeaveChat", joinedChatRef.current).catch(() => {});
+      }
+      if (selectedChatId) {
+        try {
+          await conn.invoke("JoinChat", selectedChatId);
+          joinedChatRef.current = selectedChatId;
+        } catch (err) {
+          console.error("Failed to join chat:", err);
+        }
+      }
+    };
+    joinChat();
+
+    return () => {
+      if (joinedChatRef.current && conn.state === "Connected") {
+        conn.invoke("LeaveChat", joinedChatRef.current).catch(() => {});
+        joinedChatRef.current = null;
+      }
+    };
+  }, [selectedChatId]);
+
+  // Load older messages (infinite scroll)
+  const loadOlderMessages = useCallback(async () => {
+    if (!selectedChatId || !hasMoreMessages || loadingMessages) return;
+    const oldest = messages[0];
+    if (!oldest) return;
+    setLoadingMessages(true);
+    try {
+      const older = await getMessages(selectedChatId, { before: oldest.createdAt });
+      if (!older || older.length === 0) {
+        setHasMoreMessages(false);
+      } else {
+        setMessages((prev) => [...older, ...prev]);
+      }
+    } catch (err) {
+      console.error("Failed to load older messages:", err);
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, [selectedChatId, hasMoreMessages, loadingMessages, messages]);
+
+  // Scroll handler for infinite scroll
+  const handleMessagesScroll = () => {
+    const el = messagesContainerRef.current;
+    if (el && el.scrollTop < 50) {
+      loadOlderMessages();
+    }
+  };
+
+  const selectedConv = selectedChatId
+    ? conversations.find((c) => c.chatId === selectedChatId)
     : null;
 
-  const unreadMessagesCount = mockConversations.reduce((acc, conv) => acc + conv.unread, 0);
+  const otherUserId = selectedConv?.otherUserId;
+
+  const handleSelectConversation = (chatId) => {
+    setSelectedChatId(chatId);
+    navigate(`/messages/${chatId}`, { replace: true });
+  };
+
+  const handleSendMessage = async () => {
+    const text = messageInput.trim();
+    if (!text || !selectedChatId || !otherUserId || sendingMessage) return;
+    setMessageInput("");
+    setSendingMessage(true);
+    try {
+      const msg = await sendMessage(selectedChatId, otherUserId, text);
+      // Append immediately (isOwn should be true from API)
+      setMessages((prev) => {
+        if (prev.some((m) => m.messageId === msg.messageId)) return prev;
+        return [...prev, msg];
+      });
+      // Update conversation preview
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.chatId === selectedChatId
+            ? { ...c, lastMessage: text, lastMessageAt: msg.createdAt }
+            : c
+        )
+      );
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      setMessageInput(text); // restore input on failure
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   const unreadNotificationsCount = mockNotifications.filter((n) => !n.read).length;
-  const hasConversations = mockConversations.length > 0;
+  const unreadMessagesCount = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+  const hasConversations = conversations.length > 0;
+
+  const filteredConversations = searchQuery
+    ? conversations.filter((c) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          c.otherUsername?.toLowerCase().includes(q) ||
+          c.otherFirstName?.toLowerCase().includes(q) ||
+          c.otherLastName?.toLowerCase().includes(q) ||
+          c.lastMessage?.toLowerCase().includes(q)
+        );
+      })
+    : conversations;
+
+  const formatTime = (isoString) => {
+    if (!isoString) return "";
+    const d = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffDays === 0) {
+      return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    } else if (diffDays === 1) {
+      return "Yesterday";
+    } else if (diffDays < 7) {
+      return d.toLocaleDateString([], { weekday: "short" });
+    }
+    return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  };
 
   const getNotificationIcon = (icon) => {
     switch (icon) {
@@ -235,11 +354,10 @@ export function MessagesPage() {
     }
   };
 
-  const handleSendMessage = () => {
-    if (messageInput.trim()) {
-      // Handle sending message
-      setMessageInput("");
-    }
+  const displayName = (conv) => {
+    if (conv.otherFirstName && conv.otherLastName)
+      return `${conv.otherFirstName} ${conv.otherLastName}`;
+    return conv.otherUsername || "Unknown";
   };
 
   return (
@@ -266,7 +384,7 @@ export function MessagesPage() {
                 border:
                   viewMode === "messages"
                     ? "1px solid var(--border)"
-                    : "1px solid transparent"
+                    : "1px solid transparent",
               }}
             >
               <div className="flex items-center justify-center gap-2">
@@ -292,7 +410,7 @@ export function MessagesPage() {
                 border:
                   viewMode === "notifications"
                     ? "1px solid var(--border)"
-                    : "1px solid transparent"
+                    : "1px solid transparent",
               }}
             >
               <div className="flex items-center justify-center gap-2">
@@ -327,7 +445,7 @@ export function MessagesPage() {
                   style={{
                     background: "var(--panel-2)",
                     borderColor: "var(--border)",
-                    color: "var(--text)"
+                    color: "var(--text)",
                   }}
                 />
               </div>
@@ -344,30 +462,39 @@ export function MessagesPage() {
         {/* Conversations / Notifications List */}
         <div className="flex-1 overflow-y-auto relative">
           {viewMode === "messages" ? (
-            /* Conversations List */
             <div className="h-full relative">
-              {hasConversations ? (
+              {loadingConvos ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-muted)" }} />
+                </div>
+              ) : hasConversations ? (
                 <div>
-                  {mockConversations.map((conversation) => (
+                  {filteredConversations.map((conversation) => (
                     <button
-                      key={conversation.id}
-                      onClick={() => setSelectedConversation(conversation.id)}
+                      key={conversation.chatId}
+                      onClick={() => handleSelectConversation(conversation.chatId)}
                       className="w-full p-4 border-b transition-all hover:bg-[var(--panel-2)] text-left"
                       style={{
                         borderColor: "var(--border)",
                         background:
-                          selectedConversation === conversation.id ? "var(--panel-2)" : "transparent"
+                          selectedChatId === conversation.chatId ? "var(--panel-2)" : "transparent",
                       }}
                     >
                       <div className="flex items-start gap-3">
                         <div className="relative shrink-0">
-                          <img
-                            src={conversation.avatar}
-                            alt={conversation.name}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                          {conversation.online && (
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--panel)]"></div>
+                          {conversation.otherProfilePicUrl ? (
+                            <img
+                              src={conversation.otherProfilePicUrl}
+                              alt={displayName(conversation)}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="w-12 h-12 rounded-full grid place-items-center text-[16px] font-medium"
+                              style={{ background: "var(--panel-2)", color: "var(--text)" }}
+                            >
+                              {(conversation.otherFirstName?.[0] || conversation.otherUsername?.[0] || "?").toUpperCase()}
+                            </div>
                           )}
                         </div>
 
@@ -375,16 +502,8 @@ export function MessagesPage() {
                           <div className="flex items-start justify-between mb-1">
                             <div className="flex-1 min-w-0">
                               <div className="text-[14px] truncate" style={{ color: "var(--text)" }}>
-                                {conversation.name}
+                                {displayName(conversation)}
                               </div>
-                              {conversation.jobTitle && (
-                                <div
-                                  className="text-[12px] truncate"
-                                  style={{ color: "var(--text-muted)" }}
-                                >
-                                  {conversation.jobTitle}
-                                </div>
-                              )}
                             </div>
 
                             <div className="flex flex-col items-end gap-1 ml-2">
@@ -392,22 +511,21 @@ export function MessagesPage() {
                                 className="text-[11px] whitespace-nowrap"
                                 style={{ color: "var(--text-muted)" }}
                               >
-                                {conversation.timestamp}
+                                {formatTime(conversation.lastMessageAt)}
                               </span>
-
-                              {conversation.unread > 0 && (
+                              {conversation.unreadCount > 0 && (
                                 <span
                                   className="px-2 py-0.5 rounded-full text-[11px] min-w-[20px] text-center"
                                   style={{ background: "var(--accent)", color: "#ffffff" }}
                                 >
-                                  {conversation.unread}
+                                  {conversation.unreadCount}
                                 </span>
                               )}
                             </div>
                           </div>
 
                           <p className="text-[13px] truncate" style={{ color: "var(--text-muted)" }}>
-                            {conversation.lastMessage}
+                            {conversation.lastMessage || "No messages yet"}
                           </p>
                         </div>
                       </div>
@@ -415,7 +533,6 @@ export function MessagesPage() {
                   ))}
                 </div>
               ) : (
-                /* Empty State */
                 <div className="absolute bottom-8 left-0 right-0 px-4">
                   <p className="text-[13px] text-center" style={{ color: "var(--text-muted)" }}>
                     Conversations will appear here
@@ -432,7 +549,7 @@ export function MessagesPage() {
                   className="p-4 border-b transition-all hover:bg-[var(--panel-2)] cursor-pointer"
                   style={{
                     borderColor: "var(--border)",
-                    background: !notification.read ? "rgba(137, 0, 168, 0.05)" : "transparent"
+                    background: !notification.read ? "rgba(137, 0, 168, 0.05)" : "transparent",
                   }}
                 >
                   <div className="flex items-start gap-3">
@@ -440,7 +557,7 @@ export function MessagesPage() {
                       className="w-10 h-10 rounded-full grid place-items-center shrink-0"
                       style={{
                         background: !notification.read ? "rgba(137, 0, 168, 0.15)" : "var(--panel-2)",
-                        color: !notification.read ? "var(--accent)" : "var(--text-muted)"
+                        color: !notification.read ? "var(--accent)" : "var(--text-muted)",
                       }}
                     >
                       {getNotificationIcon(notification.icon)}
@@ -474,8 +591,7 @@ export function MessagesPage() {
       {/* Main Content - Message Thread or Empty State */}
       {viewMode === "messages" && (
         <>
-          {!hasConversations ? (
-            /* Empty State */
+          {!hasConversations && !loadingConvos ? (
             <div className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}>
               <div className="text-center px-8 max-w-md">
                 <div className="mb-6 flex justify-center">
@@ -495,6 +611,7 @@ export function MessagesPage() {
                 </p>
 
                 <button
+                  onClick={() => navigate("/hire-talent")}
                   className="px-6 py-3 rounded-lg transition-all hover:opacity-90"
                   style={{ background: "var(--accent)", color: "#ffffff" }}
                 >
@@ -511,21 +628,27 @@ export function MessagesPage() {
               >
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <img
-                      src={selectedConv.avatar}
-                      alt={selectedConv.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                    {selectedConv.online && (
-                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--panel)]"></div>
+                    {selectedConv.otherProfilePicUrl ? (
+                      <img
+                        src={selectedConv.otherProfilePicUrl}
+                        alt={displayName(selectedConv)}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="w-10 h-10 rounded-full grid place-items-center text-[14px] font-medium"
+                        style={{ background: "var(--panel-2)", color: "var(--text)" }}
+                      >
+                        {(selectedConv.otherFirstName?.[0] || selectedConv.otherUsername?.[0] || "?").toUpperCase()}
+                      </div>
                     )}
                   </div>
                   <div>
                     <div className="text-[15px]" style={{ color: "var(--text)" }}>
-                      {selectedConv.name}
+                      {displayName(selectedConv)}
                     </div>
                     <div className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      {selectedConv.online ? "Active now" : "Offline"}
+                      @{selectedConv.otherUsername}
                     </div>
                   </div>
                 </div>
@@ -541,7 +664,7 @@ export function MessagesPage() {
                     onClick={() => setShowConversationInfo(!showConversationInfo)}
                     className="p-2 rounded-lg transition-all hover:bg-[var(--panel-2)]"
                     style={{
-                      background: showConversationInfo ? "var(--panel-2)" : "transparent"
+                      background: showConversationInfo ? "var(--panel-2)" : "transparent",
                     }}
                   >
                     <Info className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
@@ -553,84 +676,58 @@ export function MessagesPage() {
               </div>
 
               {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ background: "var(--bg)" }}>
-                {mockMessages.map((message) => (
-                  <div key={message.id} className={`flex ${message.isOwn ? "justify-end" : "justify-start"}`}>
+              <div
+                ref={messagesContainerRef}
+                onScroll={handleMessagesScroll}
+                className="flex-1 overflow-y-auto p-6 space-y-4"
+                style={{ background: "var(--bg)" }}
+              >
+                {loadingMessages && messages.length === 0 && (
+                  <div className="flex items-center justify-center h-32">
+                    <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-muted)" }} />
+                  </div>
+                )}
+
+                {hasMoreMessages && messages.length > 0 && (
+                  <div className="text-center">
+                    <button
+                      onClick={loadOlderMessages}
+                      disabled={loadingMessages}
+                      className="text-[13px] px-4 py-2 rounded-lg transition-all hover:bg-[var(--panel-2)]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {loadingMessages ? "Loading..." : "Load older messages"}
+                    </button>
+                  </div>
+                )}
+
+                {messages.map((message) => (
+                  <div key={message.messageId} className={`flex ${message.isOwn ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[70%] ${message.isOwn ? "items-end" : "items-start"} flex flex-col gap-1`}>
+                      {!message.isOwn && (
+                        <span className="text-[11px] px-2" style={{ color: "var(--text-muted)" }}>
+                          {message.senderUsername}
+                        </span>
+                      )}
                       <div
                         className="px-4 py-3 rounded-2xl text-[14px]"
                         style={{
                           background: message.isOwn ? "var(--accent)" : "var(--panel)",
                           color: message.isOwn ? "#ffffff" : "var(--text)",
                           borderBottomRightRadius: message.isOwn ? "4px" : "16px",
-                          borderBottomLeftRadius: message.isOwn ? "16px" : "4px"
+                          borderBottomLeftRadius: message.isOwn ? "16px" : "4px",
                         }}
                       >
-                        {message.content}
-
-                        {/* Attachment */}
-                        {message.attachment && (
-                          <div
-                            className="mt-3 p-3 rounded-lg flex items-center gap-3 border"
-                            style={{
-                              background: message.isOwn ? "rgba(255, 255, 255, 0.1)" : "var(--panel-2)",
-                              borderColor: message.isOwn ? "rgba(255, 255, 255, 0.2)" : "var(--border)"
-                            }}
-                          >
-                            <div
-                              className="w-10 h-10 rounded-lg grid place-items-center shrink-0"
-                              style={{
-                                background: message.isOwn ? "rgba(255, 255, 255, 0.15)" : "var(--chip)"
-                              }}
-                            >
-                              {message.attachment.type === "image" ? (
-                                <ImageIcon
-                                  className="w-5 h-5"
-                                  style={{ color: message.isOwn ? "#ffffff" : "var(--text-muted)" }}
-                                />
-                              ) : (
-                                <File
-                                  className="w-5 h-5"
-                                  style={{ color: message.isOwn ? "#ffffff" : "var(--text-muted)" }}
-                                />
-                              )}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div
-                                className="text-[13px] truncate"
-                                style={{ color: message.isOwn ? "#ffffff" : "var(--text)" }}
-                              >
-                                {message.attachment.name}
-                              </div>
-                              {message.attachment.size && (
-                                <div
-                                  className="text-[11px]"
-                                  style={{
-                                    color: message.isOwn ? "rgba(255, 255, 255, 0.7)" : "var(--text-muted)"
-                                  }}
-                                >
-                                  {message.attachment.size}
-                                </div>
-                              )}
-                            </div>
-
-                            <button className="shrink-0">
-                              <Download
-                                className="w-4 h-4"
-                                style={{ color: message.isOwn ? "#ffffff" : "var(--text-muted)" }}
-                              />
-                            </button>
-                          </div>
-                        )}
+                        {message.text}
                       </div>
 
                       <span className="text-[11px] px-2" style={{ color: "var(--text-muted)" }}>
-                        {message.timestamp}
+                        {formatTime(message.createdAt)}
                       </span>
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Message Input */}
@@ -657,23 +754,46 @@ export function MessagesPage() {
                         background: "var(--panel-2)",
                         borderColor: "var(--border)",
                         color: "var(--text)",
-                        maxHeight: "120px"
+                        maxHeight: "120px",
                       }}
                     />
                   </div>
 
                   <button
                     onClick={handleSendMessage}
-                    disabled={!messageInput.trim()}
+                    disabled={!messageInput.trim() || sendingMessage}
                     className="p-3 rounded-lg transition-all hover:opacity-90 disabled:opacity-50 shrink-0"
                     style={{
                       background: "var(--accent)",
-                      color: "#ffffff"
+                      color: "#ffffff",
                     }}
                   >
-                    <Send className="w-5 h-5" />
+                    {sendingMessage ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
+              </div>
+            </div>
+          ) : hasConversations ? (
+            <div className="flex-1 flex items-center justify-center" style={{ background: "var(--bg)" }}>
+              <div className="text-center px-8 max-w-md">
+                <div className="mb-6 flex justify-center">
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center"
+                    style={{ border: "2px solid var(--border)" }}
+                  >
+                    <MessageSquare className="w-8 h-8" style={{ color: "var(--text-muted)" }} />
+                  </div>
+                </div>
+                <h2 className="text-[20px] mb-2" style={{ color: "var(--text)" }}>
+                  Select a conversation
+                </h2>
+                <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+                  Choose a conversation from the sidebar to start chatting
+                </p>
               </div>
             </div>
           ) : null}
@@ -699,30 +819,27 @@ export function MessagesPage() {
 
             {/* Profile */}
             <div className="text-center mb-6">
-              <img
-                src={selectedConv.avatar}
-                alt={selectedConv.name}
-                className="w-20 h-20 rounded-full object-cover mx-auto mb-3"
-              />
+              {selectedConv.otherProfilePicUrl ? (
+                <img
+                  src={selectedConv.otherProfilePicUrl}
+                  alt={displayName(selectedConv)}
+                  className="w-20 h-20 rounded-full object-cover mx-auto mb-3"
+                />
+              ) : (
+                <div
+                  className="w-20 h-20 rounded-full grid place-items-center text-[24px] font-medium mx-auto mb-3"
+                  style={{ background: "var(--panel-2)", color: "var(--text)" }}
+                >
+                  {(selectedConv.otherFirstName?.[0] || selectedConv.otherUsername?.[0] || "?").toUpperCase()}
+                </div>
+              )}
               <h3 className="text-[18px] mb-1" style={{ color: "var(--text)" }}>
-                {selectedConv.name}
+                {displayName(selectedConv)}
               </h3>
               <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-                {selectedConv.type === "client" ? "Client" : "Freelancer"}
+                @{selectedConv.otherUsername}
               </p>
             </div>
-
-            {/* Job Info */}
-            {selectedConv.jobTitle && (
-              <div className="p-4 rounded-xl mb-6" style={{ background: "var(--panel-2)" }}>
-                <div className="text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-                  Current Job
-                </div>
-                <div className="text-[14px]" style={{ color: "var(--text)" }}>
-                  {selectedConv.jobTitle}
-                </div>
-              </div>
-            )}
 
             {/* Quick Actions */}
             <div className="space-y-2 mb-6">
@@ -744,31 +861,6 @@ export function MessagesPage() {
                   Delete Conversation
                 </span>
               </button>
-            </div>
-
-            {/* Shared Files */}
-            <div>
-              <h4 className="text-[14px] mb-3" style={{ color: "var(--text)" }}>
-                Shared Files
-              </h4>
-              <div className="space-y-2">
-                <div
-                  className="p-3 rounded-lg flex items-center gap-3 border"
-                  style={{ background: "var(--panel-2)", borderColor: "var(--border)" }}
-                >
-                  <div className="w-10 h-10 rounded-lg grid place-items-center shrink-0" style={{ background: "var(--chip)" }}>
-                    <File className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] truncate" style={{ color: "var(--text)" }}>
-                      Analytics_Report.pdf
-                    </div>
-                    <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      2.4 MB
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>

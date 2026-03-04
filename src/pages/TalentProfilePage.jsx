@@ -13,6 +13,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { mockTalentProfile } from "../data/mockTalentProfile";
+import { getOrCreateChat } from "../services/chatService";
 
 function TalentProfilePage() {
   const { talentId } = useParams();
@@ -48,6 +49,15 @@ function TalentProfilePage() {
   }
 
   const onBack = () => navigate(-1);
+
+  const handleSendMessage = async () => {
+    try {
+      const chat = await getOrCreateChat(profile.id);
+      navigate(`/messages/${chat.chatId}`);
+    } catch (err) {
+      console.error("Failed to start chat:", err);
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto" style={{ background: "var(--bg)" }}>
@@ -245,6 +255,7 @@ function TalentProfilePage() {
                   Invite to Job
                 </button>
                 <button
+                  onClick={handleSendMessage}
                   className="px-6 py-3 rounded-full border transition-all hover:border-[var(--accent)]"
                   style={{
                     background: "var(--panel-2)",

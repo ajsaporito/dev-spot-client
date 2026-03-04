@@ -1,32 +1,48 @@
 import { X, Star, Send } from "lucide-react";
 import { useState } from "react";
+import toast from "react-hot-toast";
+import { createReview } from "../services/reviewsService";
 
-export function LeaveReviewModal({ isOpen, onClose, jobTitle, clientName, onSubmit }) {
+export function LeaveReviewModal({ isOpen, onClose, onSuccess, jobId, jobTitle, clientName }) {
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [review, setReview] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (rating === 0) return;
-
-    console.log("Submitting review:", { rating, review, jobTitle, clientName });
-    if (onSubmit) onSubmit(rating, review);
-
-    // Reset and close
+  const reset = () => {
     setRating(0);
     setHoveredRating(0);
     setReview("");
-    onClose();
+    setIsSubmitting(false);
   };
 
   const handleClose = () => {
-    setRating(0);
-    setHoveredRating(0);
-    setReview("");
+    reset();
     onClose();
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (rating === 0 || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await createReview({ jobId, rating, comments: review.trim() || undefined });
+      toast.success("Review submitted!");
+      reset();
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      const msg = err.message || "";
+      if (msg.startsWith("401") || msg.startsWith("403")) {
+        toast.error("Please log in to leave a review.");
+      } else {
+        toast.error("Failed to submit review. Please try again.");
+      }
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -48,9 +64,11 @@ export function LeaveReviewModal({ isOpen, onClose, jobTitle, clientName, onSubm
             <h2 className="text-[22px]" style={{ color: "var(--text)" }}>
               Leave a Review
             </h2>
-            <p className="text-[14px] mt-1" style={{ color: "var(--text-muted)" }}>
-              Rate your experience with <span style={{ color: "var(--text)" }}>{clientName}</span>
-            </p>
+            {clientName && (
+              <p className="text-[14px] mt-1" style={{ color: "var(--text-muted)" }}>
+                Rate your experience with <span style={{ color: "var(--text)" }}>{clientName}</span>
+              </p>
+            )}
           </div>
           <button
             onClick={handleClose}
@@ -64,14 +82,16 @@ export function LeaveReviewModal({ isOpen, onClose, jobTitle, clientName, onSubm
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Job Info */}
-          <div className="p-4 rounded-lg" style={{ background: "var(--panel-2)" }}>
-            <div className="text-[13px] mb-1" style={{ color: "var(--text-muted)" }}>
-              Completed Job
+          {jobTitle && (
+            <div className="p-4 rounded-lg" style={{ background: "var(--panel-2)" }}>
+              <div className="text-[13px] mb-1" style={{ color: "var(--text-muted)" }}>
+                Completed Job
+              </div>
+              <div className="text-[16px]" style={{ color: "var(--text)" }}>
+                {jobTitle}
+              </div>
             </div>
-            <div className="text-[16px]" style={{ color: "var(--text)" }}>
-              {jobTitle}
-            </div>
-          </div>
+          )}
 
           {/* Star Rating */}
           <div>
@@ -128,14 +148,10 @@ export function LeaveReviewModal({ isOpen, onClose, jobTitle, clientName, onSubm
               placeholder="Share details about your experience. What went well? What could be improved?"
               rows={6}
               className="w-full px-4 py-3 rounded-lg border outline-none transition-colors text-[14px] resize-none"
-              style={{
-                background: "var(--panel-2)",
-                borderColor: "var(--border)",
-                color: "var(--text)",
-              }}
+              style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
             />
             <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>
-              Your review will be visible to other users on the platform. 
+              Your review will be visible to other users on the platform.
             </p>
           </div>
 
@@ -145,23 +161,18 @@ export function LeaveReviewModal({ isOpen, onClose, jobTitle, clientName, onSubm
               type="button"
               onClick={handleClose}
               className="flex-1 px-6 py-3 rounded-lg border transition-colors text-[14px] hover:opacity-80"
-              style={{
-                background: "var(--panel-2)",
-                borderColor: "var(--border)",
-                color: "var(--text)",
-              }}
+              style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
             >
               Cancel
             </button>
-
             <button
               type="submit"
-              disabled={rating === 0}
+              disabled={rating === 0 || isSubmitting}
               className="flex-1 px-6 py-3 rounded-lg transition-opacity text-[14px] disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
               style={{ background: "var(--accent)", color: "#ffffff" }}
             >
               <Send className="w-4 h-4 inline mr-2" />
-              Submit Review
+              {isSubmitting ? "Submitting…" : "Submit Review"}
             </button>
           </div>
         </form>
