@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { getOpenJobs } from "../services/jobsService";
-import { createRequest } from "../services/requestsService";
+import { createRequest, getMyRequests } from "../services/requestsService";
 import { Search, Heart, ChevronRight } from "lucide-react";
 
 export function FindJobsPage() {
@@ -31,6 +31,13 @@ export function FindJobsPage() {
           setLoading(false);
         }
       });
+    getMyRequests()
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) {
+          setAppliedJobs(new Set(data.map((r) => r.jobId)));
+        }
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 

@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { Plus, Search, MessageSquare, Bell, User, LogOut, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { getUser, clearSession } from "../api/client";
+import { getUser, clearSession, picUrl } from "../api/client";
 import { getConversations } from "../services/chatService";
 import { getNotifications } from "../services/notificationService";
 
@@ -32,11 +32,16 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    getConversations()
-      .then((convos) => {
-        setHasUnread((convos || []).some((c) => c.unreadCount > 0));
-      })
-      .catch(() => {});
+    const refresh = () => {
+      getConversations()
+        .then((convos) => {
+          setHasUnread((convos || []).some((c) => c.unreadCount > 0));
+        })
+        .catch(() => {});
+    };
+    refresh();
+    window.addEventListener("devspot:messages-changed", refresh);
+    return () => window.removeEventListener("devspot:messages-changed", refresh);
   }, []);
 
   useEffect(() => {
@@ -179,7 +184,7 @@ const Navbar = () => {
             >
               {me?.profilePicUrl ? (
                 <img
-                  src={`https://localhost:7048${me.profilePicUrl}`}
+                  src={picUrl(me.profilePicUrl)}
                   alt="Profile Picture"
                   className="w-full h-full object-cover"
                 />

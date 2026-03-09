@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
-import { Search, MapPin, Heart, Star } from "lucide-react";
-import { getFreelancers } from "../services/talentService";
+import { Search, MapPin, Heart, Star, SlidersHorizontal, X } from "lucide-react";
+import { getFreelancers, getFreelancerReviews } from "../services/talentService";
+import { picUrl } from "../api/client";
 import { InviteToJobModal } from "./InviteToJobModal";
 
 function HireTalentPage() {
@@ -11,6 +12,10 @@ function HireTalentPage() {
   const [talents, setTalents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedSkills, setSelectedSkills] = useState(new Set());
+  const [skillSearch, setSkillSearch] = useState("");
+  const [skillsVisible, setSkillsVisible] = useState(12);
   const debounceRef = useRef(null);
 
   const fetchTalents = async (query = "") => {
@@ -18,7 +23,26 @@ function HireTalentPage() {
       setLoading(true);
       setError(null);
       const data = await getFreelancers(query);
-      setTalents(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+
+      // Fetch reviews for each freelancer to compute averageRating/reviewCount
+      const enriched = await Promise.all(
+        list.map(async (talent) => {
+          try {
+            const reviews = await getFreelancerReviews(talent.userId);
+            const arr = Array.isArray(reviews) ? reviews : [];
+            const reviewCount = arr.length;
+            const averageRating = reviewCount > 0
+              ? Math.round(arr.reduce((sum, r) => sum + Number(r.rating), 0) / reviewCount * 10) / 10
+              : 0;
+            return { ...talent, averageRating, reviewCount };
+          } catch {
+            return { ...talent, averageRating: 0, reviewCount: 0 };
+          }
+        })
+      );
+
+      setTalents(enriched);
     } catch (err) {
       console.error("Failed to fetch freelancers:", err);
       setError("Failed to load freelancers. Please try again.");
@@ -48,6 +72,42 @@ function HireTalentPage() {
     }
     setSavedTalents(newSaved);
   };
+
+  // Collect all unique skills from loaded talents
+  const allSkills = [...new Set(talents.flatMap((t) => t.skills || []))].sort();
+
+  const toggleSkill = (skill) => {
+    setSelectedSkills((prev) => {
+      const next = new Set(prev);
+      if (next.has(skill)) next.delete(skill);
+      else next.add(skill);
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setSelectedSkills(new Set());
+    setSkillSearch("");
+    setSkillsVisible(12);
+  };
+
+  // Skills matching the search, with selected ones shown first
+  const visibleSkills = (() => {
+    const q = skillSearch.toLowerCase().trim();
+    const matched = q ? allSkills.filter((s) => s.toLowerCase().includes(q)) : allSkills;
+    return [
+      ...matched.filter((s) => selectedSkills.has(s)),
+      ...matched.filter((s) => !selectedSkills.has(s)),
+    ];
+  })();
+
+  // Filter talents by selected skills (must have ALL selected skills)
+  const filteredTalents = selectedSkills.size > 0
+    ? talents.filter((t) => {
+        const skills = t.skills || [];
+        return [...selectedSkills].every((s) => skills.includes(s));
+      })
+    : talents;
 
   const formatRate = (rate) => {
     if (rate == null) return null;
@@ -87,9 +147,115 @@ function HireTalentPage() {
                 }}
               />
             </div>
-            <button className="text-[14px]" style={{ color: "var(--accent)" }}>
-              Advanced search
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowFilters((prev) => !prev)}
+                className="flex items-center gap-2 text-[14px] px-4 py-2 rounded-lg border transition-all hover:bg-[var(--panel-2)]"
+                style={{
+                  color: showFilters ? "var(--accent)" : "var(--text-muted)",
+                  borderColor: showFilters ? "var(--accent)" : "var(--border)",
+                  background: showFilters ? "rgba(137, 0, 168, 0.08)" : "transparent",
+                }}
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                Filters
+                {selectedSkills.size > 0 && (
+                  <span
+                    className="px-1.5 py-0.5 rounded-full text-[11px] min-w-[20px] text-center"
+                    style={{ background: "var(--accent)", color: "#ffffff" }}
+                  >
+                    {selectedSkills.size}
+                  </span>
+                )}
+              </button>
+
+              {/* Skill Filters Dropdown */}
+              {showFilters && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowFilters(false)} />
+                  <div
+                    className="absolute right-0 top-full mt-2 w-[340px] rounded-xl border p-4 z-20"
+                    style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "0 8px 24px rgba(0,0,0,0.3)" }}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-[14px] font-medium" style={{ color: "var(--text)" }}>
+                        Filter by skills
+                      </h3>
+                      {selectedSkills.size > 0 && (
+                        <button
+                          onClick={clearFilters}
+                          className="flex items-center gap-1 text-[13px] transition-colors hover:opacity-70"
+                          style={{ color: "var(--accent)" }}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                    {allSkills.length === 0 ? (
+                      <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+                        No skills available to filter.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="relative mb-3">
+                          <Search
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                            style={{ color: "var(--text-muted)" }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Search skills..."
+                            value={skillSearch}
+                            onChange={(e) => { setSkillSearch(e.target.value); setSkillsVisible(12); }}
+                            className="w-full pl-9 pr-4 py-2 rounded-lg border text-[13px] outline-none transition-all focus:border-[var(--accent)]"
+                            style={{
+                              background: "var(--panel-2)",
+                              borderColor: "var(--border)",
+                              color: "var(--text)",
+                            }}
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto">
+                          {visibleSkills.length === 0 ? (
+                            <p className="text-[13px] py-1" style={{ color: "var(--text-muted)" }}>
+                              No skills match "{skillSearch}"
+                            </p>
+                          ) : (
+                            visibleSkills.slice(0, skillsVisible).map((skill) => {
+                              const isActive = selectedSkills.has(skill);
+                              return (
+                                <button
+                                  key={skill}
+                                  onClick={() => toggleSkill(skill)}
+                                  className="px-3 py-1.5 rounded-full text-[13px] transition-all"
+                                  style={{
+                                    background: isActive ? "rgba(137, 0, 168, 0.15)" : "var(--panel-2)",
+                                    color: isActive ? "var(--accent)" : "var(--text-muted)",
+                                    border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                  }}
+                                >
+                                  {skill}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                        {visibleSkills.length > skillsVisible && (
+                          <button
+                            onClick={() => setSkillsVisible((prev) => prev + 12)}
+                            className="mt-2 text-[13px] transition-colors hover:opacity-70"
+                            style={{ color: "var(--accent)" }}
+                          >
+                            Show more ({visibleSkills.length - skillsVisible} remaining)
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Header */}
@@ -116,15 +282,15 @@ function HireTalentPage() {
             </p>
           )}
 
-          {!loading && !error && talents.length === 0 && (
+          {!loading && !error && filteredTalents.length === 0 && (
             <p className="text-center py-8" style={{ color: "var(--text-muted)" }}>
-              No freelancers found.
+              {selectedSkills.size > 0 ? "No freelancers match the selected skills." : "No freelancers found."}
             </p>
           )}
 
           {!loading &&
             !error &&
-            talents.map((talent) => {
+            filteredTalents.map((talent) => {
               const name = [talent.firstName, talent.lastName].filter(Boolean).join(" ") || talent.username;
               const rate = formatRate(talent.hourlyRate);
 
@@ -147,7 +313,7 @@ function HireTalentPage() {
                       {/* Profile Image */}
                       {talent.profilePicUrl ? (
                         <img
-                          src={talent.profilePicUrl}
+                          src={picUrl(talent.profilePicUrl)}
                           alt={name}
                           className="w-16 h-16 rounded-full object-cover shrink-0"
                         />
@@ -255,12 +421,10 @@ function HireTalentPage() {
                     <span style={{ color: "var(--text-muted)" }}>
                       {formatEarnings(talent.totalEarned)} earned
                     </span>
-                    {talent.averageRating != null && (
-                      <span className="flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
-                        <Star className="w-3.5 h-3.5 fill-current" style={{ color: "#eab308" }} />
-                        {Number(talent.averageRating).toFixed(1)} ({talent.reviewCount})
-                      </span>
-                    )}
+                    <span className="flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
+                      <Star className="w-3.5 h-3.5 fill-current" style={{ color: "#eab308" }} />
+                      {Number(talent.averageRating || 0).toFixed(1)} ({talent.reviewCount || 0})
+                    </span>
                   </div>
 
                   {/* Skills */}

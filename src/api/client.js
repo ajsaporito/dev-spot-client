@@ -33,6 +33,12 @@ export function clearSession() {
   clearUser();
 }
 
+export function picUrl(path) {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  return `${API_BASE}${path}`;
+}
+
 export function safeJson(text) {
   try {
     return JSON.parse(text);

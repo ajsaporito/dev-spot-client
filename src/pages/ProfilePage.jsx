@@ -11,7 +11,7 @@ import {
 
 import { getProfile, updateProfile } from "../services/user";
 import { uploadProfilePhoto } from "../services/upload";
-import { getUser } from "../api/client";
+import { getUser, setUser, picUrl } from "../api/client";
 import { getFreelancerReviews } from "../services/talentService";
 
 function IconButton({ title, onClick, children, className = "" }) {
@@ -120,8 +120,6 @@ export default function ProfilePage() {
   const [errors, setErrors] = useState({});
   const [reviews, setReviews] = useState([]);
 
-  const me = getUser();
-
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -130,6 +128,7 @@ export default function ProfilePage() {
         setForm(data);
 
         // Fetch reviews for the logged-in user
+        const me = getUser();
         const userId = data?.userId ?? me?.userId;
         if (userId) {
           const revs = await getFreelancerReviews(userId).catch(() => []);
@@ -148,15 +147,16 @@ export default function ProfilePage() {
     if (!file) return;
 
     try {
-      const { profilePicUrl } = await uploadProfilePhoto(file);
+      await uploadProfilePhoto(file);
 
-      // update page immediately (so you see the new image)
-      // Option A: re-fetch profile (simplest, always correct)
+      // Re-fetch profile so the page shows the new image
       const fresh = await getProfile();
       setProfile(fresh);
       setForm((prev) => ({ ...fresh, passwordChange: prev.passwordChange }));
 
-      // Option B: if you keep user in localStorage, update it there too (see below)
+      // Sync localStorage so Navbar picks up the new pic immediately
+      const me = getUser();
+      if (me) setUser({ ...me, profilePicUrl: fresh.profilePicUrl });
     } catch (err) {
       console.error(err);
       alert(err.message || "Photo upload failed");
@@ -221,8 +221,6 @@ export default function ProfilePage() {
       ...prev,
       skills: prev.skills.filter((_, i) => i !== idx),
     }));
-
-  const isBlank = (v) => !v || !String(v).trim();
 
   const parseDateOnly = (yyyyMMdd) => {
     // expects "YYYY-MM-DD" (what your date input produces)
@@ -316,8 +314,6 @@ export default function ProfilePage() {
     return s.slice(0, 10); // "YYYY-MM-DD"
   };
 
-  //const fromDateInputValue = (v) => (v ? new Date(v).toISOString() : null);
-
   const handleSaveAll = async () => {
     if (!validateForm()) return;
 
@@ -340,6 +336,16 @@ export default function ProfilePage() {
           confirmNewPassword: "",
         },
       });
+
+      // Sync localStorage so Navbar reflects name/username/pic changes
+      const current = getUser();
+      if (current) {
+        setUser({
+          ...current,
+          username: updated.username,
+          profilePicUrl: updated.profilePicUrl,
+        });
+      }
 
       setErrors({});
       setJustSaved(true);
@@ -400,7 +406,7 @@ export default function ProfilePage() {
                   >
                     {profile?.profilePicUrl ? (
                       <img
-                        src={`https://localhost:7048${profile.profilePicUrl}`}
+                        src={picUrl(profile.profilePicUrl)}
                         alt="Profile"
                         className="w-full h-full object-cover"
                       />
@@ -789,12 +795,14 @@ export default function ProfilePage() {
                   style={{ scrollbarColor: "var(--border) transparent" }}
                 >
                   <div className="space-y-3">
-                    {form.education.map((edu, idx) => (
+                    {form.education.map((edu, idx) => {
+                      const eduErr = errors.education?.[idx] || {};
+                      return (
                       <div
                         key={idx}
                         className="rounded-2xl border p-3"
                         style={{
-                          borderColor: "var(--border)",
+                          borderColor: Object.keys(eduErr).length > 0 ? "red" : "var(--border)",
                           background: "var(--panel)",
                         }}
                       >
@@ -806,6 +814,7 @@ export default function ProfilePage() {
                                 onChange={(e) => updateEducation(idx, { school: e.target.value })}
                                 placeholder="School"
                               />
+                              {eduErr.school && <div className="text-red-500 text-[11px] mt-1 px-1">{eduErr.school}</div>}
                             </div>
                             <div>
                               <GhostInput
@@ -813,9 +822,10 @@ export default function ProfilePage() {
                                 onChange={(e) => updateEducation(idx, { degree: e.target.value })}
                                 placeholder="Degree"
                               />
+                              {eduErr.degree && <div className="text-red-500 text-[11px] mt-1 px-1">{eduErr.degree}</div>}
                             </div>
 
-                          
+
                             <div>
                               <GhostInput
                                 type="date"
@@ -823,6 +833,7 @@ export default function ProfilePage() {
                                 onChange={(e) => updateEducation(idx, { startDate: e.target.value })}
                                 placeholder="Start Date"
                               />
+                              {eduErr.startDate && <div className="text-red-500 text-[11px] mt-1 px-1">{eduErr.startDate}</div>}
                             </div>
 
                             <div>
@@ -832,6 +843,7 @@ export default function ProfilePage() {
                                 onChange={(e) => updateEducation(idx, { endDate: e.target.value })}
                                 placeholder="End Date"
                               />
+                              {eduErr.endDate && <div className="text-red-500 text-[11px] mt-1 px-1">{eduErr.endDate}</div>}
                             </div>
                           </div>
 
@@ -848,7 +860,8 @@ export default function ProfilePage() {
                           </button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -887,7 +900,7 @@ export default function ProfilePage() {
                     <div className="flex items-center gap-3 mb-3">
                       {review.clientProfilePicUrl ? (
                         <img
-                          src={review.clientProfilePicUrl}
+                          src={picUrl(review.clientProfilePicUrl)}
                           alt={review.clientUsername}
                           className="w-10 h-10 rounded-full object-cover"
                         />
@@ -930,6 +943,13 @@ export default function ProfilePage() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* General Error */}
+        {errors.general && (
+          <div className="mt-4 px-4 py-3 rounded-xl text-[13px] text-red-400" style={{ background: "rgba(239,68,68,0.1)" }}>
+            {errors.general}
           </div>
         )}
 

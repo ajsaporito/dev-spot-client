@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 
 import { getJob, deleteJob } from "../services/jobsService";
-import { createRequest } from "../services/requestsService";
+import { getUser } from "../api/client";
+import { createRequest, getMyRequests } from "../services/requestsService";
 import { ViewRequestsModal } from "./ViewRequestsModal.jsx";
 
 export function JobDetailPage() {
@@ -43,6 +44,15 @@ export function JobDetailPage() {
           setLoading(false);
         }
       });
+    getMyRequests()
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) {
+          if (data.some((r) => String(r.jobId) === String(id))) {
+            setApplied(true);
+          }
+        }
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [id]);
 
@@ -81,14 +91,8 @@ export function JobDetailPage() {
 
   // Check if current user owns this job
   const currentUserId = (() => {
-    try {
-      const raw = localStorage.getItem("devspot_user");
-      if (!raw) return null;
-      const u = JSON.parse(raw);
-      return u?.id ?? u?.userId ?? null;
-    } catch {
-      return null;
-    }
+    const u = getUser();
+    return u?.id ?? u?.userId ?? null;
   })();
   const isOwner = job && currentUserId && String(job.clientId) === String(currentUserId);
 

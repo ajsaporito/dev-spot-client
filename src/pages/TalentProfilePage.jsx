@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { getFreelancerProfile, getFreelancerReviews, getFreelancers } from "../services/talentService";
 import { getOrCreateChat } from "../services/chatService";
+import { picUrl } from "../api/client";
 import { InviteToJobModal } from "./InviteToJobModal";
 
 function TalentProfilePage() {
@@ -174,7 +175,7 @@ function TalentProfilePage() {
               <div className="flex items-start gap-4 mb-6">
                 {profile.profilePicUrl ? (
                   <img
-                    src={profile.profilePicUrl}
+                    src={picUrl(profile.profilePicUrl)}
                     alt={name}
                     className="w-24 h-24 rounded-full object-cover shrink-0"
                   />
@@ -411,7 +412,7 @@ function TalentProfilePage() {
                       <div className="flex items-center gap-3 mb-3">
                         {review.clientProfilePicUrl ? (
                           <img
-                            src={review.clientProfilePicUrl}
+                            src={picUrl(review.clientProfilePicUrl)}
                             alt={review.clientUsername}
                             className="w-10 h-10 rounded-full object-cover"
                           />

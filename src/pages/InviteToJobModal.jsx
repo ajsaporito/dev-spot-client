@@ -1,16 +1,15 @@
 import { useState, useEffect } from "react";
-import { X, Briefcase, Send, DollarSign } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { X, Briefcase, Send, DollarSign, CheckCircle2 } from "lucide-react";
 import { getMyJobs } from "../services/jobsService";
 import { getOrCreateChat, sendMessage } from "../services/chatService";
 
 export function InviteToJobModal({ isOpen, onClose, freelancerId, freelancerName }) {
-  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -18,6 +17,7 @@ export function InviteToJobModal({ isOpen, onClose, freelancerId, freelancerName
     setError(null);
     setLoading(true);
     setSelectedJobId(null);
+    setSent(false);
 
     getMyJobs()
       .then((data) => {
@@ -59,8 +59,10 @@ export function InviteToJobModal({ isOpen, onClose, freelancerId, freelancerName
       const chat = await getOrCreateChat(freelancerId);
       const message = `Hi! I'd like to invite you to my job: [${job.title}](/job/${job.id})`;
       await sendMessage(chat.chatId, freelancerId, message);
-      onClose();
-      navigate(`/messages/${chat.chatId}`);
+      setSent(true);
+      setTimeout(() => {
+        onClose();
+      }, 1400);
     } catch (err) {
       setError(err.message || "Failed to send invite");
       setSending(false);
@@ -77,6 +79,24 @@ export function InviteToJobModal({ isOpen, onClose, freelancerId, freelancerName
         className="relative w-full max-w-2xl max-h-[90vh] rounded-2xl overflow-hidden flex flex-col"
         style={{ background: "var(--panel)", boxShadow: "var(--shadow)" }}
       >
+        {sent ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-4">
+            <div className="relative">
+              <div
+                className="absolute inset-0 rounded-full animate-ping"
+                style={{ background: "rgba(137, 0, 168, 0.25)" }}
+              />
+              <div
+                className="relative w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(137, 0, 168, 0.15)" }}
+              >
+                <CheckCircle2 className="w-9 h-9" style={{ color: "var(--accent)" }} />
+              </div>
+            </div>
+            <p className="text-[17px]" style={{ color: "var(--text)" }}>Invite sent!</p>
+          </div>
+        ) : (
+        <>
         {/* Header */}
         <div
           className="px-6 py-5 border-b flex items-center justify-between flex-shrink-0"

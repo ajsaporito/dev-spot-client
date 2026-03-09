@@ -20,7 +20,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { getConversations, getMessages, sendMessage } from "../services/chatService";
 import { getChatConnection } from "../lib/chatConnection";
-import { getNotifications, markNotificationRead, clearAllNotifications } from "../services/notificationService";
+import { getNotifications, markNotificationRead, markChatNotificationsRead, clearAllNotifications } from "../services/notificationService";
+import { picUrl } from "../api/client";
 
 const iconMap = {
   Message: MessageSquare,
@@ -133,6 +134,8 @@ export function MessagesPage() {
     setConversations((prev) =>
       prev.map((c) => c.chatId === selectedChatId ? { ...c, unreadCount: 0 } : c)
     );
+    markChatNotificationsRead(selectedChatId).catch(() => {});
+    window.dispatchEvent(new CustomEvent("devspot:messages-changed"));
     let cancelled = false;
     (async () => {
       setLoadingMessages(true);
@@ -340,6 +343,8 @@ export function MessagesPage() {
       navigate(`/messages/${notification.chatId}`);
     } else if (notification.type === "Request" && notification.jobId) {
       navigate(`/job/${notification.jobId}`);
+    } else if (notification.type === "Review") {
+      navigate("/profile");
     } else {
       navigate("/dashboard");
     }
@@ -481,7 +486,7 @@ export function MessagesPage() {
                         <div className="relative shrink-0">
                           {conversation.otherProfilePicUrl ? (
                             <img
-                              src={conversation.otherProfilePicUrl}
+                              src={picUrl(conversation.otherProfilePicUrl)}
                               alt={displayName(conversation)}
                               className="w-12 h-12 rounded-full object-cover"
                             />
@@ -643,7 +648,7 @@ export function MessagesPage() {
                   <div className="relative">
                     {selectedConv.otherProfilePicUrl ? (
                       <img
-                        src={selectedConv.otherProfilePicUrl}
+                        src={picUrl(selectedConv.otherProfilePicUrl)}
                         alt={displayName(selectedConv)}
                         className="w-10 h-10 rounded-full object-cover"
                       />
@@ -667,12 +672,6 @@ export function MessagesPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button className="p-2 rounded-lg transition-all hover:bg-[var(--panel-2)]">
-                    <Phone className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
-                  </button>
-                  <button className="p-2 rounded-lg transition-all hover:bg-[var(--panel-2)]">
-                    <Video className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
-                  </button>
                   <button
                     onClick={() => setShowConversationInfo(!showConversationInfo)}
                     className="p-2 rounded-lg transition-all hover:bg-[var(--panel-2)]"
@@ -836,7 +835,7 @@ export function MessagesPage() {
             <div className="text-center mb-6">
               {selectedConv.otherProfilePicUrl ? (
                 <img
-                  src={selectedConv.otherProfilePicUrl}
+                  src={picUrl(selectedConv.otherProfilePicUrl)}
                   alt={displayName(selectedConv)}
                   className="w-20 h-20 rounded-full object-cover mx-auto mb-3"
                 />

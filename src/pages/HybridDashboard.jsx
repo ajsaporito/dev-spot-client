@@ -41,46 +41,6 @@ const formatDate = (raw) => {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
-function AssignedFreelancer({ jobId }) {
-  const [freelancer, setFreelancer] = useState(null);
-
-  useEffect(() => {
-    if (!jobId) return;
-    getRequestsForJob(jobId)
-      .then((reqs) => {
-        const accepted = (reqs || []).find(
-          (r) => (r.status || "").toLowerCase() === "accepted"
-        );
-        if (accepted) setFreelancer(accepted);
-      })
-      .catch(() => {});
-  }, [jobId]);
-
-  if (!freelancer) return null;
-
-  return (
-    <div className="flex items-center gap-2 mt-1">
-      {freelancer.freelancerProfilePicUrl ? (
-        <img
-          src={freelancer.freelancerProfilePicUrl}
-          alt={freelancer.freelancerName}
-          className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-        />
-      ) : (
-        <div
-          className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: "var(--panel-2)" }}
-        >
-          <User className="w-3 h-3" style={{ color: "var(--text-muted)" }} />
-        </div>
-      )}
-      <span className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-        Assigned to <span style={{ color: "var(--text)" }}>{freelancer.freelancerName}</span>
-      </span>
-    </div>
-  );
-}
-
 function OpenJobCard({ job, onViewRequests, onDelete }) {
   const [requestCount, setRequestCount] = useState(null);
   const [deleting, setDeleting] = useState(false);
