@@ -3,6 +3,8 @@ import { Plus, Search, MessageSquare, Bell, User, LogOut, ChevronDown } from "lu
 import { useEffect, useRef, useState } from "react";
 
 import { getUser, clearSession } from "../api/client";
+import { getConversations } from "../services/chatService";
+import { getNotifications } from "../services/notificationService";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -10,6 +12,8 @@ const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const [me, setMe] = useState(() => getUser());
+  const [hasUnread, setHasUnread] = useState(false);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 
   useEffect(() => {
     const onClickOutside = (e) => {
@@ -25,6 +29,30 @@ const Navbar = () => {
     const refresh = () => setMe(getUser());
     window.addEventListener("devspot:user-changed", refresh);
     return () => window.removeEventListener("devspot:user-changed", refresh);
+  }, []);
+
+  useEffect(() => {
+    getConversations()
+      .then((convos) => {
+        setHasUnread((convos || []).some((c) => c.unreadCount > 0));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    getNotifications()
+      .then((notifs) => {
+        setHasUnreadNotifications((notifs || []).some((n) => !n.isRead));
+      })
+      .catch(() => {});
+
+    const onChanged = () => {
+      getNotifications()
+        .then((notifs) => setHasUnreadNotifications((notifs || []).some((n) => !n.isRead)))
+        .catch(() => {});
+    };
+    window.addEventListener("devspot:notifications-changed", onChanged);
+    return () => window.removeEventListener("devspot:notifications-changed", onChanged);
   }, []);
 
   const handleLogout = () => {
@@ -108,20 +136,33 @@ const Navbar = () => {
         </NavLink>
 
         <NavLink
-        to="/messages"
+          to="/messages"
           className="p-2 rounded-lg hover:bg-opacity-10 transition-colors relative"
           style={{ color: "var(--text-muted)" }}
           aria-label="Messages"
         >
           <MessageSquare className="w-5 h-5" />
+          {hasUnread && (
+            <span
+              className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full border-2"
+              style={{ background: "var(--accent)", borderColor: "var(--panel)" }}
+            />
+          )}
         </NavLink>
 
         <button
+          onClick={() => navigate("/messages")}
           className="p-2 rounded-lg hover:bg-opacity-10 transition-colors relative"
           style={{ color: "var(--text-muted)" }}
           aria-label="Notifications"
         >
           <Bell className="w-5 h-5" />
+          {hasUnreadNotifications && (
+            <span
+              className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full border-2"
+              style={{ background: "var(--accent)", borderColor: "var(--panel)" }}
+            />
+          )}
         </button>
 
         {/* Avatar Dropdown */}

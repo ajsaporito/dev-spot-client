@@ -6,12 +6,13 @@ import {
   Star,
   RefreshCw,
   Trash2,
+  CheckCircle2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { LeaveReviewModal } from "./LeaveReviewModal.jsx";
 import { ViewRequestsModal } from "./ViewRequestsModal.jsx";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { getMyJobs, updateJobStatus, deleteJob } from "../services/jobsService";
 import { getMyReviews } from "../services/reviewsService";
 import { getRequestsForJob, getMyRequests } from "../services/requestsService";
@@ -173,8 +174,7 @@ function OpenJobCard({ job, onViewRequests, onDelete }) {
 function MessageDeveloperModal({ freelancer, jobTitle, onClose }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const navigate = useNavigate();
-
+  const [sent, setSent] = useState(false);
   const handleSend = async () => {
     if (!text.trim()) return;
     setSending(true);
@@ -182,12 +182,12 @@ function MessageDeveloperModal({ freelancer, jobTitle, onClose }) {
       const userId = freelancer.freelancerId ?? freelancer.freelancerUserId ?? freelancer.id;
       const chat = await getOrCreateChat(userId);
       await sendMessage(chat.chatId, userId, text.trim());
-      toast.success("Message sent!");
-      onClose();
-      navigate(`/messages/${chat.chatId}`);
+      setSent(true);
+      setTimeout(() => {
+        onClose();
+      }, 1400);
     } catch (err) {
       toast.error(err.message || "Failed to send message");
-    } finally {
       setSending(false);
     }
   };
@@ -196,54 +196,74 @@ function MessageDeveloperModal({ freelancer, jobTitle, onClose }) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && !sent) onClose(); }}
     >
       <div
         className="w-full max-w-md rounded-[16px] border p-6"
         style={{ background: "var(--panel)", borderColor: "var(--border)", boxShadow: "var(--shadow)" }}
       >
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-[20px] font-medium" style={{ color: "var(--text)" }}>
-            Message {freelancer.freelancerName}
-          </h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:opacity-70"
-            style={{ color: "var(--text-muted)" }}
-          >
-            ✕
-          </button>
-        </div>
-        {jobTitle && (
-          <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>
-            Re: {jobTitle}
-          </p>
+        {sent ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-4">
+            <div className="relative">
+              <div
+                className="absolute inset-0 rounded-full animate-ping"
+                style={{ background: "rgba(137, 0, 168, 0.25)" }}
+              />
+              <div
+                className="relative w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(137, 0, 168, 0.15)" }}
+              >
+                <CheckCircle2 className="w-9 h-9" style={{ color: "var(--accent)" }} />
+              </div>
+            </div>
+            <p className="text-[17px]" style={{ color: "var(--text)" }}>Message sent!</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-[20px] font-medium" style={{ color: "var(--text)" }}>
+                Message {freelancer.freelancerName}
+              </h2>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center rounded-full transition-colors hover:opacity-70"
+                style={{ color: "var(--text-muted)" }}
+              >
+                ✕
+              </button>
+            </div>
+            {jobTitle && (
+              <p className="text-[13px] mb-4" style={{ color: "var(--text-muted)" }}>
+                Re: {jobTitle}
+              </p>
+            )}
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type your message…"
+              rows={5}
+              className="w-full rounded-[10px] px-4 py-3 text-[14px] resize-none outline-none border"
+              style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
+            />
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-full text-[13px] border transition-colors hover:opacity-80"
+                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSend}
+                disabled={!text.trim() || sending}
+                className="px-4 py-2 rounded-full text-[13px] transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "var(--accent)", color: "#ffffff" }}
+              >
+                {sending ? "Sending…" : "Send"}
+              </button>
+            </div>
+          </>
         )}
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Type your message…"
-          rows={5}
-          className="w-full rounded-[10px] px-4 py-3 text-[14px] resize-none outline-none border"
-          style={{ background: "var(--panel-2)", borderColor: "var(--border)", color: "var(--text)" }}
-        />
-        <div className="flex justify-end gap-3 mt-4">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-full text-[13px] border transition-colors hover:opacity-80"
-            style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={!text.trim() || sending}
-            className="px-4 py-2 rounded-full text-[13px] transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: "var(--accent)", color: "#ffffff" }}
-          >
-            {sending ? "Sending…" : "Send"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -513,7 +533,7 @@ export function HybridDashboard() {
   const openJobs = allJobs.filter((j) => normalize(j.status) === "open");
   const jobsInProgress = allJobs.filter((j) => normalize(j.status) === "inprogress");
   const completedJobs = allJobs.filter((j) => normalize(j.status) === "completed");
-  const deletedJobs = allJobs.filter((j) => normalize(j.status) === "deleted");
+  const deletedJobs = allJobs.filter((j) => normalize(j.status) === "cancelled");
 
   const openRequests = (job) => { setSelectedJob(job); setIsRequestsOpen(true); };
   const closeRequests = () => { setIsRequestsOpen(false); setSelectedJob(null); };
@@ -599,7 +619,7 @@ export function HybridDashboard() {
                         job={job}
                         onViewRequests={openRequests}
                         onDelete={(id) => setAllJobs((prev) =>
-                          prev.map((j) => (j.id === id ? { ...j, status: "Deleted" } : j))
+                          prev.map((j) => (j.id === id ? { ...j, status: "Cancelled" } : j))
                         )}
                       />
                     ))}

@@ -11,94 +11,66 @@ import {
   Trash2,
   Bell,
   MessageSquare,
-  AlertCircle,
-  CheckCircle2,
   Briefcase,
-  DollarSign,
-  FileText,
   X,
   SlidersHorizontal,
   Loader2,
 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { getConversations, getMessages, sendMessage } from "../services/chatService";
 import { getChatConnection } from "../lib/chatConnection";
+import { getNotifications, markNotificationRead, clearAllNotifications } from "../services/notificationService";
 
-const mockNotifications = [
-  {
-    id: "1",
-    type: "message",
-    title: "New message from Scary Nemo",
-    description: "Thanks for the update on the campaign. Can you send the analytics report?",
-    timestamp: "2 minutes ago",
-    read: false,
-    icon: "message",
-  },
-  {
-    id: "2",
-    type: "payment",
-    title: "Payment received",
-    description: 'You received $5,250.00 for "Facebook & Google Ads Management"',
-    timestamp: "1 hour ago",
-    read: false,
-    icon: "dollar",
-  },
-  {
-    id: "3",
-    type: "job",
-    title: "New job invitation",
-    description: 'Sarah Johnson invited you to "E-commerce Marketing Campaign"',
-    timestamp: "3 hours ago",
-    read: true,
-    icon: "briefcase",
-  },
-  {
-    id: "4",
-    type: "contract",
-    title: "Contract milestone completed",
-    description: 'Milestone 2 of 4 for "Brand Identity Design" has been approved',
-    timestamp: "5 hours ago",
-    read: true,
-    icon: "check",
-  },
-  {
-    id: "5",
-    type: "message",
-    title: "New message from Michael Chen",
-    description: "I've completed the logo variations. Ready for your review.",
-    timestamp: "3 hours ago",
-    read: true,
-    icon: "message",
-  },
-  {
-    id: "6",
-    type: "job",
-    title: "Job proposal accepted",
-    description: 'Your proposal for "Mobile App Development" was accepted',
-    timestamp: "Yesterday",
-    read: true,
-    icon: "briefcase",
-  },
-  {
-    id: "7",
-    type: "alert",
-    title: "Profile view milestone",
-    description: "Your profile has been viewed 100 times this week!",
-    timestamp: "Yesterday",
-    read: true,
-    icon: "alert",
-  },
-  {
-    id: "8",
-    type: "contract",
-    title: "New contract started",
-    description: 'Contract for "SEO Optimization" is now active',
-    timestamp: "2 days ago",
-    read: true,
-    icon: "file",
-  },
-];
+const iconMap = {
+  Message: MessageSquare,
+  Request: Briefcase,
+  Review: Star,
+  JobUpdate: Briefcase,
+};
+
+function formatRelativeTime(isoString) {
+  if (!isoString) return "";
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  return new Date(isoString).toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+/** Render message text, converting [label](/path) into clickable links */
+function renderMessageText(text, isOwn) {
+  if (!text) return text;
+  const parts = [];
+  const regex = /\[([^\]]+)\]\((\/[^)]+)\)/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <Link
+        key={match.index}
+        to={match[2]}
+        className="underline font-medium"
+        style={{ color: isOwn ? "#ffffff" : "var(--accent)" }}
+      >
+        {match[1]}
+      </Link>
+    );
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts.length > 1 ? parts : text;
+}
 
 export function MessagesPage() {
   const { chatId: urlChatId } = useParams();
@@ -114,6 +86,7 @@ export function MessagesPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [notifications, setNotifications] = useState([]);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -136,6 +109,15 @@ export function MessagesPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Load notifications on mount
+  useEffect(() => {
+    let cancelled = false;
+    getNotifications()
+      .then((data) => { if (!cancelled) setNotifications(data || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   // Sync URL param → selectedChatId
   useEffect(() => {
     if (urlChatId) setSelectedChatId(Number(urlChatId));
@@ -147,6 +129,10 @@ export function MessagesPage() {
       setMessages([]);
       return;
     }
+    // Clear unread badge immediately when chat is opened
+    setConversations((prev) =>
+      prev.map((c) => c.chatId === selectedChatId ? { ...c, unreadCount: 0 } : c)
+    );
     let cancelled = false;
     (async () => {
       setLoadingMessages(true);
@@ -303,7 +289,7 @@ export function MessagesPage() {
     }
   };
 
-  const unreadNotificationsCount = mockNotifications.filter((n) => !n.read).length;
+  const unreadNotificationsCount = notifications.filter((n) => !n.isRead).length;
   const unreadMessagesCount = conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
   const hasConversations = conversations.length > 0;
 
@@ -335,23 +321,34 @@ export function MessagesPage() {
     return d.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  const getNotificationIcon = (icon) => {
-    switch (icon) {
-      case "message":
-        return <MessageSquare className="w-5 h-5" />;
-      case "briefcase":
-        return <Briefcase className="w-5 h-5" />;
-      case "dollar":
-        return <DollarSign className="w-5 h-5" />;
-      case "file":
-        return <FileText className="w-5 h-5" />;
-      case "check":
-        return <CheckCircle2 className="w-5 h-5" />;
-      case "alert":
-        return <AlertCircle className="w-5 h-5" />;
-      default:
-        return <Bell className="w-5 h-5" />;
+  const getNotificationIcon = (type) => {
+    const Icon = iconMap[type] || Bell;
+    return <Icon className="w-5 h-5" />;
+  };
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.isRead) {
+      await markNotificationRead(notification.notificationId).catch(() => {});
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.notificationId === notification.notificationId ? { ...n, isRead: true } : n
+        )
+      );
+      window.dispatchEvent(new CustomEvent("devspot:notifications-changed"));
     }
+    if (notification.type === "Message" && notification.chatId) {
+      navigate(`/messages/${notification.chatId}`);
+    } else if (notification.type === "Request" && notification.jobId) {
+      navigate(`/job/${notification.jobId}`);
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
+  const handleClearAll = async () => {
+    await clearAllNotifications().catch(() => {});
+    setNotifications([]);
+    window.dispatchEvent(new CustomEvent("devspot:notifications-changed"));
   };
 
   const displayName = (conv) => {
@@ -361,10 +358,10 @@ export function MessagesPage() {
   };
 
   return (
-    <div className="h-full flex" style={{ background: "var(--bg)" }}>
+    <div className="flex overflow-hidden" style={{ height: "calc(100vh - 64px)", background: "var(--bg)" }}>
       {/* Left Sidebar - Conversations List / Notifications */}
       <div
-        className="w-[380px] border-r flex flex-col"
+        className="w-[380px] border-r flex flex-col min-h-0"
         style={{ background: "var(--panel)", borderColor: "var(--border)" }}
       >
         {/* Header */}
@@ -543,46 +540,62 @@ export function MessagesPage() {
           ) : (
             /* Notifications List */
             <div>
-              {mockNotifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className="p-4 border-b transition-all hover:bg-[var(--panel-2)] cursor-pointer"
-                  style={{
-                    borderColor: "var(--border)",
-                    background: !notification.read ? "rgba(137, 0, 168, 0.05)" : "transparent",
-                  }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="w-10 h-10 rounded-full grid place-items-center shrink-0"
-                      style={{
-                        background: !notification.read ? "rgba(137, 0, 168, 0.15)" : "var(--panel-2)",
-                        color: !notification.read ? "var(--accent)" : "var(--text-muted)",
-                      }}
-                    >
-                      {getNotificationIcon(notification.icon)}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-1">
-                        <div className="text-[14px]" style={{ color: "var(--text)" }}>
-                          {notification.title}
-                        </div>
-                        <span
-                          className="text-[11px] whitespace-nowrap ml-2"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          {notification.timestamp}
-                        </span>
+              {notifications.length > 0 && (
+                <div className="flex justify-end px-4 py-2 border-b" style={{ borderColor: "var(--border)" }}>
+                  <button
+                    onClick={handleClearAll}
+                    className="text-[12px] transition-colors hover:opacity-70"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
+              {notifications.length === 0 ? (
+                <div className="absolute bottom-8 left-0 right-0 px-4">
+                  <p className="text-[13px] text-center" style={{ color: "var(--text-muted)" }}>
+                    No notifications
+                  </p>
+                </div>
+              ) : (
+                notifications.map((notification) => (
+                  <div
+                    key={notification.notificationId}
+                    onClick={() => handleNotificationClick(notification)}
+                    className="p-4 border-b transition-all hover:bg-[var(--panel-2)] cursor-pointer"
+                    style={{
+                      borderColor: "var(--border)",
+                      background: !notification.isRead ? "rgba(137, 0, 168, 0.05)" : "transparent",
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full grid place-items-center shrink-0"
+                        style={{
+                          background: !notification.isRead ? "rgba(137, 0, 168, 0.15)" : "var(--panel-2)",
+                          color: !notification.isRead ? "var(--accent)" : "var(--text-muted)",
+                        }}
+                      >
+                        {getNotificationIcon(notification.type)}
                       </div>
 
-                      <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-                        {notification.description}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="text-[14px]" style={{ color: "var(--text)" }}>
+                            {notification.title}
+                          </div>
+                          <span
+                            className="text-[11px] whitespace-nowrap ml-2"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {formatRelativeTime(notification.createdAt)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
         </div>
@@ -620,7 +633,7 @@ export function MessagesPage() {
               </div>
             </div>
           ) : selectedConv ? (
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0">
               {/* Chat Header */}
               <div
                 className="h-16 border-b flex items-center justify-between px-6"
@@ -679,9 +692,10 @@ export function MessagesPage() {
               <div
                 ref={messagesContainerRef}
                 onScroll={handleMessagesScroll}
-                className="flex-1 overflow-y-auto p-6 space-y-4"
+                className="flex-1 overflow-y-auto p-6"
                 style={{ background: "var(--bg)" }}
               >
+                <div className="flex flex-col justify-end min-h-full gap-4">
                 {loadingMessages && messages.length === 0 && (
                   <div className="flex items-center justify-center h-32">
                     <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-muted)" }} />
@@ -718,7 +732,7 @@ export function MessagesPage() {
                           borderBottomLeftRadius: message.isOwn ? "16px" : "4px",
                         }}
                       >
-                        {message.text}
+                        {renderMessageText(message.text, message.isOwn)}
                       </div>
 
                       <span className="text-[11px] px-2" style={{ color: "var(--text-muted)" }}>
@@ -728,6 +742,7 @@ export function MessagesPage() {
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
+                </div>
               </div>
 
               {/* Message Input */}

@@ -6,11 +6,13 @@ import {
   Save,
   X,
   Pencil,
+  Star,
 } from "lucide-react";
 
 import { getProfile, updateProfile } from "../services/user";
 import { uploadProfilePhoto } from "../services/upload";
 import { getUser } from "../api/client";
+import { getFreelancerReviews } from "../services/talentService";
 
 function IconButton({ title, onClick, children, className = "" }) {
   return (
@@ -116,6 +118,7 @@ export default function ProfilePage() {
   const [newSkill, setNewSkill] = useState("");
   const [justSaved, setJustSaved] = useState(false);
   const [errors, setErrors] = useState({});
+  const [reviews, setReviews] = useState([]);
 
   const me = getUser();
 
@@ -125,6 +128,13 @@ export default function ProfilePage() {
         const data = await getProfile();
         setProfile(data);
         setForm(data);
+
+        // Fetch reviews for the logged-in user
+        const userId = data?.userId ?? me?.userId;
+        if (userId) {
+          const revs = await getFreelancerReviews(userId).catch(() => []);
+          setReviews(Array.isArray(revs) ? revs : []);
+        }
       } catch (err) {
         console.error(err);
       }
@@ -845,6 +855,84 @@ export default function ProfilePage() {
             </div>
           </aside>
         </div>
+
+        {/* Reviews Section */}
+        {reviews.length > 0 && (
+          <div className="mt-6">
+            <div
+              className="rounded-2xl border p-6"
+              style={{ background: "var(--panel)", borderColor: "var(--border)" }}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-[16px] font-semibold" style={{ color: "var(--text)" }}>
+                  Reviews ({reviews.length})
+                </h2>
+                {(() => {
+                  const avg = reviews.reduce((sum, r) => sum + Number(r.rating), 0) / reviews.length;
+                  return (
+                    <span className="flex items-center gap-1 text-[14px]" style={{ color: "var(--text-muted)" }}>
+                      <Star className="w-4 h-4 fill-current" style={{ color: "#eab308" }} />
+                      {avg.toFixed(1)} average
+                    </span>
+                  );
+                })()}
+              </div>
+              <div className="space-y-4">
+                {reviews.map((review) => (
+                  <div
+                    key={review.reviewId}
+                    className="p-4 rounded-xl"
+                    style={{ background: "var(--panel-2)" }}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      {review.clientProfilePicUrl ? (
+                        <img
+                          src={review.clientProfilePicUrl}
+                          alt={review.clientUsername}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-medium"
+                          style={{ background: "var(--bg)", color: "var(--text-muted)" }}
+                        >
+                          {(review.clientUsername?.[0] || "?").toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <p className="text-[14px] font-medium" style={{ color: "var(--text)" }}>
+                          {review.clientUsername}
+                        </p>
+                        <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                          {review.jobTitle}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-current" style={{ color: "#eab308" }} />
+                        <span className="text-[14px]" style={{ color: "var(--text)" }}>
+                          {Number(review.rating).toFixed(1)}
+                        </span>
+                      </div>
+                    </div>
+                    {review.comments && (
+                      <p className="text-[14px]" style={{ color: "var(--text-muted)" }}>
+                        {review.comments}
+                      </p>
+                    )}
+                    <p className="text-[11px] mt-2" style={{ color: "var(--text-muted)" }}>
+                      {new Date(review.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Save Bar */}
         {(isDirty || justSaved) && (
           <div className="mt-6">
