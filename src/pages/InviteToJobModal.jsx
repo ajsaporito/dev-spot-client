@@ -228,6 +228,8 @@ export function InviteToJobModal({ isOpen, onClose, freelancerId, freelancerName
             </button>
           </div>
         </div>
+        </>
+      )}
       </div>
     </div>
   );
